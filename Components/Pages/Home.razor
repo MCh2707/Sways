@@ -1,0 +1,608 @@
+@page "/"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject ProfileService ProfileService
+@inject ClubService ClubService
+@inject ChatService ChatService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+
+<PageTitle>Home – Sways</PageTitle>
+
+<NavMenu />
+
+<main>
+    <section class="server-side">
+        @if (UserSession.IsLoggedIn && currentUser != null)
+        {
+            <section class="server-profile">
+                <div class="server-banner"></div>
+                <div class="server-profile-pic" style="background-image:url('@currentUser.ProfilePicUrl');background-size:cover;">
+                    <div class="server-profile-status" style="width:20px;height:20px;background:#22c55e;border-radius:50%;position:absolute;bottom:0;right:0;border:3px solid white;"></div>
+                </div>
+                <h1>@currentUser.Username</h1>
+                <div class="server-follower-container">
+                    <div class="server-posts">
+                        <h2>Posts</h2>
+                        <p style="font-weight:700;font-size:16px;">@postCount</p>
+                    </div>
+                    <div class="server-followers">
+                        <h2>Followers</h2>
+                        <p style="font-weight:700;font-size:16px;">@followersCount</p>
+                    </div>
+                    <div class="server-following">
+                        <h2>Following</h2>
+                        <p style="font-weight:700;font-size:16px;">@followingCount</p>
+                    </div>
+                </div>
+                <a href="/profile" id="server-profileBtn">Go to Profile</a>
+            </section>
+        }
+        else
+        {
+            <section class="server-profile">
+                <div class="server-banner"></div>
+                <div class="server-profile-pic"></div>
+                <h1>Guest</h1>
+                <p style="color:#666;font-size:13px;margin:10px 0;text-align:center;">Log in to upload blogs & polls!</p>
+                <a href="/auth" id="server-profileBtn">Log In / Sign Up</a>
+            </section>
+        }
+
+        <section class="server">
+            <div class="server-side-header">
+                <h1 style="font-size:18px;font-weight:700;margin-bottom:10px;">Community / Clubs</h1>
+            </div>
+            <div class="server-side-content">
+                @if (userClubs.Count == 0)
+                {
+                    <p style="color:#888;font-size:13px;padding:10px 0;">No clubs joined yet.</p>
+                }
+                @foreach (var club in userClubs)
+                {
+                    <div class="server-community-profile">
+                        <div class="server-community-pic"></div>
+                        <div style="flex:1;">
+                            <div style="font-weight:700;font-size:14px;">@club.Name</div>
+                            <div style="color:#888;font-size:11px;">@club.Members.Count member@(club.Members.Count != 1 ? "s" : "")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (UserSession.IsLoggedIn)
+            {
+                <button @onclick="() => showCreateClub = true"
+                        style="background:royalblue;color:white;border:none;border-radius:10px;padding:10px;font-size:14px;cursor:pointer;width:100%;margin-top:12px;font-weight:600;transition:0.2s;">
+                    + Create New Club
+                </button>
+            }
+
+            <div class="search-community-container" style="margin-top:15px;">
+                <input type="text" id="AddServer" @bind="inviteCodeInput" placeholder="Paste Link Here..." />
+                <button id="AddServerBtn" @onclick="JoinClub">Add New Community</button>
+                @if (!string.IsNullOrEmpty(clubJoinMessage))
+                {
+                    <p style="@(clubJoinSuccess ? "color:green;" : "color:red;") font-size:13px;margin-top:5px;text-align:center;font-weight:600;">@clubJoinMessage</p>
+                }
+            </div>
+        </section>
+    </section>
+
+    <section class="main-side">
+        @if (!feedLoaded)
+        {
+            <div style="text-align:center;padding:40px;color:#888;font-size:16px;">Loading feed...</div>
+        }
+        else if (feedItems.Count == 0)
+        {
+            <div style="text-align:center;padding:60px 20px;color:#666;background:white;border-radius:20px;">
+                <p style="font-size:22px;font-weight:700;color:royalblue;">No posts uploaded yet!</p>
+                <p style="margin-top:10px;">Be the first to share a blog or poll.</p>
+                @if (UserSession.IsLoggedIn)
+                {
+                    <a href="/profile" style="display:inline-block;margin-top:20px;padding:12px 30px;background:royalblue;color:white;border-radius:10px;text-decoration:none;font-weight:700;">
+                        Go to Profile to Upload
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var item in feedItems)
+            {
+                @if (!item.IsPoll && item.Blog != null)
+                {
+                    var post = item.Blog;
+                    <section class="post">
+                        <div class="post-user-container">
+                            <a href="@(post.UserId == UserSession.CurrentUser?.Id ? "/profile" : $"/user/{post.UserId}")" class="post-profile" style="text-decoration:none;color:inherit;">
+                                <div class="post-profile-pic" style="background-image:url('@post.User?.ProfilePicUrl');background-size:cover;"></div>
+                                <h1>@(post.User?.Username ?? "Unknown")</h1>
+                            </a>
+                            <p style="font-size:14px;color:var(--muted);">Posted @GetTimeAgo(post.DatePosted)</p>
+                        </div>
+
+                        <section class="post-section">
+                            <div class="post-container" style="flex:1;">
+                                <div class="post-h2" style="display:flex;justify-content:space-between;align-items:center;">
+                                    <h2 style="font-size:20px;margin-bottom:8px;">@post.Title</h2>
+                                    <span style="font-size:12px;opacity:0.8;">@post.DatePosted.ToString("MMM d, yyyy")</span>
+                                </div>
+                                <div class="post-blog">
+                                    <p style="white-space:pre-wrap;">@post.Content</p>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(post.MediaInfo))
+                            {
+                                <section class="post-media" style="width:250px;flex-shrink:0;">
+                                    <p>@post.MediaInfo</p>
+                                </section>
+                            }
+                        </section>
+
+
+                        <div class="react-bar">
+                            <button @onclick="() => LikeBlog(post)"
+                                    style="@(HasLikedBlog(post) ? "background-color:royalblue;color:white;" : "")">
+                                ❤️ @post.Likes.Count @(post.Likes.Count == 1 ? "Like" : "Likes")
+                            </button>
+                            <button @onclick="() => ToggleCommentView(post.Id, false)">
+                                💬 @post.Comments.Count @(post.Comments.Count == 1 ? "Comment" : "Comments")
+                            </button>
+                            <button @onclick="() => ShareItem(post.Id, false)">
+                                🔗 Share
+                            </button>
+                        </div>
+
+                        @if (sharePostId == post.Id && !shareIsPoll && !string.IsNullOrEmpty(shareMsg))
+                        {
+                            <div style="background:#e6f4ea;color:#137333;padding:10px;border-radius:10px;margin-top:10px;text-align:center;font-weight:600;">
+                                @shareMsg
+                            </div>
+                        }
+
+                        @if (openCommentId == post.Id && !openCommentIsPoll)
+                        {
+                            <div style="padding:15px;border-top:1px solid var(--line);margin-top:15px;background:var(--panel-soft);border-radius:12px;">
+                                @foreach (var c in post.Comments.OrderByDescending(x => x.CreatedAt))
+                                {
+                                    <div style="padding:8px 0;border-bottom:1px solid var(--line);">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                                            <strong style="color:var(--accent);">@(c.User?.Username ?? "user")</strong>
+                                            <span style="color:var(--muted);font-size:11px;">@GetTimeAgo(c.CreatedAt)</span>
+                                        </div>
+                                        <p style="margin-top:4px;color:var(--text);">@c.Content</p>
+                                    </div>
+                                }
+                                @if (UserSession.IsLoggedIn)
+                                {
+                                    <div style="display:flex;gap:10px;margin-top:12px;">
+                                        <input style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--input);color:var(--text);outline:none;"
+                                               @bind="commentText" placeholder="Write a comment..." />
+                                        <button @onclick="() => SubmitComment(post.Id, false)"
+                                                style="background:var(--accent);color:white;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-weight:600;">
+                                            Post
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p style="color:var(--muted);font-size:13px;margin-top:8px;text-align:center;">
+                                        <a href="/auth" style="color:var(--accent);font-weight:600;">Log in</a> to comment.
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </section>
+                }
+                else if (item.IsPoll && item.Poll != null)
+                {
+                    var poll = item.Poll;
+                    int totalVotes = poll.Votes.Count;
+
+                    <section class="poll">
+                        <div class="post-user-container">
+                            <a href="@(poll.UserId == UserSession.CurrentUser?.Id ? "/profile" : $"/user/{poll.UserId}")" class="post-profile" style="text-decoration:none;color:inherit;">
+                                <div class="post-profile-pic" style="background-image:url('@poll.User?.ProfilePicUrl');background-size:cover;"></div>
+                                <h1>@(poll.User?.Username ?? "Unknown")</h1>
+                            </a>
+                            <p style="font-size:14px;color:var(--muted);">Posted @GetTimeAgo(poll.DatePosted)</p>
+                        </div>
+
+                        <div class="poll-container">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h1>@poll.Title</h1>
+                                <span style="background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:12px;font-size:12px;">
+                                    @(poll.IsSingleChoice ? "1-handed (Single choice)" : "Multiple choice")
+                                </span>
+                            </div>
+
+                            <div class="poll-suggestion">
+                                <ul>
+                                    @{
+                                        int? myVotedOption = UserSession.IsLoggedIn
+                                            ? poll.Votes.FirstOrDefault(v => v.UserId == UserSession.CurrentUser!.Id)?.PollOptionId
+                                            : null;
+                                        bool hasVoted = myVotedOption.HasValue;
+                                    }
+                                    @foreach (var opt in poll.Options)
+                                    {
+                                        int voteCount = poll.Votes.Count(v => v.PollOptionId == opt.Id);
+                                        double pct = totalVotes > 0 ? Math.Round((double)voteCount / totalVotes * 100, 1) : 0;
+                                        bool isMyVote = myVotedOption == opt.Id;
+
+                                        <li class="@(isMyVote ? "voted-option" : "")"
+                                            @onclick="() => VotePoll(poll, opt.Id)">
+                                            <div style="display:flex;align-items:center;gap:12px;flex:1;">
+                                                <div class="poll-icon"></div>
+                                                <span style="font-weight:600;">@opt.Text</span>
+                                            </div>
+                                            @if (hasVoted || isMyVote)
+                                            {
+                                                <span style="font-size:14px;font-weight:700;min-width:50px;text-align:right;">@pct%</span>
+                                            }
+                                        </li>
+                                        @if (hasVoted || isMyVote)
+                                        {
+                                            <div class="poll-progress-bg">
+                                                <div class="poll-progress-fill" style="width:@(pct)%;"></div>
+                                            </div>
+                                        }
+                                    }
+                                </ul>
+                                <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;opacity:0.9;">
+                                    <span>@totalVotes total vote@(totalVotes != 1 ? "s" : "")</span>
+                                    @if (poll.IsSingleChoice && hasVoted)
+                                    {
+                                        <span style="font-style:italic;">🔒 Vote locked (1-handed poll)</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="react-bar">
+                            <button @onclick="() => LikePoll(poll)"
+                                    style="@(HasLikedPoll(poll) ? "background-color:royalblue;color:white;" : "")">
+                                ❤️ @poll.Likes.Count @(poll.Likes.Count == 1 ? "Like" : "Likes")
+                            </button>
+                            <button @onclick="() => ToggleCommentView(poll.Id, true)">
+                                💬 @poll.Comments.Count @(poll.Comments.Count == 1 ? "Comment" : "Comments")
+                            </button>
+                            <button @onclick="() => ShareItem(poll.Id, true)">
+                                🔗 Share
+                            </button>
+                        </div>
+
+                        @if (sharePostId == poll.Id && shareIsPoll && !string.IsNullOrEmpty(shareMsg))
+                        {
+                            <div style="background:#e6f4ea;color:#137333;padding:10px;border-radius:10px;margin-top:10px;text-align:center;font-weight:600;">
+                                @shareMsg
+                            </div>
+                        }
+
+                        @if (openCommentId == poll.Id && openCommentIsPoll)
+                        {
+                            <div style="padding:15px;border-top:1px solid #eee;margin-top:15px;background:#f9fbfd;border-radius:12px;">
+                                @foreach (var c in poll.Comments.OrderByDescending(x => x.CreatedAt))
+                                {
+                                    <div style="padding:8px 0;border-bottom:1px solid #eee;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                                            <strong style="color:royalblue;">@(c.User?.Username ?? "user")</strong>
+                                            <span style="color:var(--muted);font-size:11px;">@GetTimeAgo(c.CreatedAt)</span>
+                                        </div>
+                                        <p style="margin-top:4px;color:var(--text);">@c.Content</p>
+                                    </div>
+                                }
+                                @if (UserSession.IsLoggedIn)
+                                {
+                                    <div style="display:flex;gap:10px;margin-top:12px;">
+                                        <input style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--input);color:var(--text);outline:none;"
+                                               @bind="commentText" placeholder="Write a comment..." />
+                                        <button @onclick="() => SubmitComment(poll.Id, true)"
+                                                style="background:var(--accent);color:white;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-weight:600;">
+                                            Post
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </section>
+                }
+            }
+        }
+    </section>
+
+    <section class="right-side">
+        <div class="chat">
+            <div class="search-container" style="width:100%;">
+                <input type="search" id="searchBar" value="@chatSearch"
+                       @oninput="SearchUsers" placeholder="Search..." />
+                <h1>@(chatSearch.Length > 0 ? "Search Results" : "Recent Chats")</h1>
+
+                <div class="chat-container" style="max-height:420px;overflow-y:auto;">
+                    <ul style="width:100%;padding:0;list-style:none;">
+                        @{
+                            var displayList = chatSearch.Length > 0 ? searchResults : recentChatUsers;
+                        }
+                        @if (displayList.Count == 0)
+                        {
+                            <li style="color:#888;font-size:13px;padding:15px 0;text-align:center;">
+                                @(UserSession.IsLoggedIn ? "No users found." : "Log in to chat with friends.")
+                            </li>
+                        }
+                        @foreach (var user in displayList)
+                        {
+                            <li @onclick="() => OpenChat(user)">
+                                <div class="chat-li">
+                                    <div class="chat-profile-icon" style="background-image:url('@user.ProfilePicUrl');"></div>
+                                    <div style="flex:1;">
+                                        <h2 style="font-size:15px;margin:0;font-weight:600;color:#333;">@user.Username</h2>
+                                        <div style="font-size:11px;color:#888;">@user.Name</div>
+                                    </div>
+                                    <div class="chatIcon" style="font-size:18px;">💬</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        @if (chatWith != null)
+        {
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:20px;margin-top:15px;padding:15px;box-shadow:0 4px 15px var(--shadow);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line);">
+                    <h2 style="font-size:16px;font-weight:700;color:var(--accent);">Chat with @chatWith.Username</h2>
+                    <button @onclick="() => chatWith = null" style="color:var(--muted);font-size:18px;cursor:pointer;border:none;background:none;">✕</button>
+                </div>
+
+                <div id="chat-messages" style="height:220px;overflow-y:auto;padding:5px;display:flex;flex-direction:column;gap:8px;">
+                    @if (chatMessages.Count == 0)
+                    {
+                        <p style="color:var(--muted);font-size:13px;text-align:center;">Say hi to @chatWith.Username! 👋</p>
+                    }
+                    @foreach (var msg in chatMessages)
+                    {
+                        bool isMine = msg.SenderId == UserSession.CurrentUser?.Id;
+                        <div style="display:flex;justify-content:@(isMine ? "flex-end" : "flex-start");">
+                            <div style="max-width:80%;padding:8px 14px;border-radius:@(isMine ? "16px 16px 2px 16px" : "16px 16px 16px 2px");background:@(isMine ? "var(--accent)" : "var(--panel-soft)");color:@(isMine ? "white" : "var(--text)");font-size:13px;border:1px solid var(--line);">
+                                @msg.Content
+                                <div style="font-size:10px;opacity:0.7;margin-top:3px;text-align:right;">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <input style="flex:1;padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;background:var(--input);color:var(--text);outline:none;"
+                           @bind="newMessageText"
+                           @onkeydown="HandleChatKeyDown"
+                           placeholder="Type a message..." />
+                    <button @onclick="SendMessage"
+                            style="background:var(--accent);color:white;border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;flex-shrink:0;">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        }
+    </section>
+</main>
+
+@if (UserSession.IsLoggedIn)
+{
+    <Sways.Components.CreateClubModal
+        @bind-Show="showCreateClub"
+        UserId="@(UserSession.CurrentUser!.Id)"
+        OnCreated="LoadClubs" />
+}
+
+@code {
+    private UserAccount? currentUser;
+    private List<FeedItem> feedItems = new();
+    private List<Club> userClubs = new();
+    private bool feedLoaded = false;
+    private int followersCount, followingCount, postCount;
+
+    private int openCommentId = -1;
+    private bool openCommentIsPoll = false;
+    private string commentText = "";
+
+    private int sharePostId = -1;
+    private bool shareIsPoll = false;
+    private string shareMsg = "";
+
+    private string inviteCodeInput = "";
+    private string clubJoinMessage = "";
+    private bool clubJoinSuccess = false;
+    private bool showCreateClub = false;
+
+    private string chatSearch = "";
+    private List<UserAccount> recentChatUsers = new();
+    private List<UserAccount> searchResults = new();
+    private UserAccount? chatWith = null;
+    private List<DirectMessage> chatMessages = new();
+    private string newMessageText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnStateChanged += OnSessionChanged;
+        currentUser = UserSession.CurrentUser;
+        await LoadAll();
+    }
+
+    private void OnSessionChanged()
+    {
+        currentUser = UserSession.CurrentUser;
+        InvokeAsync(LoadAll);
+    }
+
+    private async Task LoadAll()
+    {
+        feedItems = await ProfileService.GetCombinedFeedAsync();
+        feedLoaded = true;
+        if (UserSession.IsLoggedIn && currentUser != null)
+        {
+            var (fc, fw, pc) = await ProfileService.GetUserStatsAsync(currentUser.Id);
+            followersCount = fc;
+            followingCount = fw;
+            postCount = pc;
+            await LoadClubs();
+            recentChatUsers = await ChatService.GetRecentChatUsersAsync(currentUser.Id);
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadClubs()
+    {
+        if (currentUser == null) return;
+        userClubs = await ClubService.GetUserClubsAsync(currentUser.Id);
+        StateHasChanged();
+    }
+
+    private async Task LikeBlog(BlogPost post)
+    {
+        if (!UserSession.IsLoggedIn) { NavManager.NavigateTo("/auth"); return; }
+        await ProfileService.ToggleLikeBlogAsync(post.Id, UserSession.CurrentUser!.Id);
+        feedItems = await ProfileService.GetCombinedFeedAsync();
+        StateHasChanged();
+    }
+
+    private async Task LikePoll(PollPost poll)
+    {
+        if (!UserSession.IsLoggedIn) { NavManager.NavigateTo("/auth"); return; }
+        await ProfileService.ToggleLikePollAsync(poll.Id, UserSession.CurrentUser!.Id);
+        feedItems = await ProfileService.GetCombinedFeedAsync();
+        StateHasChanged();
+    }
+
+    private bool HasLikedBlog(BlogPost post)
+        => UserSession.IsLoggedIn && post.Likes.Any(l => l.UserId == UserSession.CurrentUser!.Id);
+
+    private bool HasLikedPoll(PollPost poll)
+        => UserSession.IsLoggedIn && poll.Likes.Any(l => l.UserId == UserSession.CurrentUser!.Id);
+
+    private void ToggleCommentView(int id, bool isPoll)
+    {
+        if (openCommentId == id && openCommentIsPoll == isPoll)
+        {
+            openCommentId = -1;
+        }
+        else
+        {
+            openCommentId = id;
+            openCommentIsPoll = isPoll;
+            commentText = "";
+        }
+    }
+
+    private async Task SubmitComment(int id, bool isPoll)
+    {
+        if (!UserSession.IsLoggedIn || string.IsNullOrWhiteSpace(commentText)) return;
+        if (isPoll)
+            await ProfileService.AddCommentToPollAsync(id, UserSession.CurrentUser!.Id, commentText);
+        else
+            await ProfileService.AddCommentToBlogAsync(id, UserSession.CurrentUser!.Id, commentText);
+        commentText = "";
+        feedItems = await ProfileService.GetCombinedFeedAsync();
+        StateHasChanged();
+    }
+
+    private async Task VotePoll(PollPost poll, int optionId)
+    {
+        if (!UserSession.IsLoggedIn) { NavManager.NavigateTo("/auth"); return; }
+        await ProfileService.VotePollAsync(poll.Id, optionId, UserSession.CurrentUser!.Id);
+        feedItems = await ProfileService.GetCombinedFeedAsync();
+        StateHasChanged();
+    }
+
+    private async Task ShareItem(int id, bool isPoll)
+    {
+        sharePostId = id;
+        shareIsPoll = isPoll;
+        var url = $"{NavManager.BaseUri}";
+        await JS.InvokeVoidAsync("swaysHelpers.copyToClipboard", url);
+        shareMsg = "✅ Link copied to clipboard!";
+        StateHasChanged();
+        await Task.Delay(3000);
+        shareMsg = "";
+        StateHasChanged();
+    }
+
+    private async Task JoinClub()
+    {
+        if (!UserSession.IsLoggedIn) { NavManager.NavigateTo("/auth"); return; }
+        if (string.IsNullOrWhiteSpace(inviteCodeInput)) return;
+
+        var (success, message, club) = await ClubService.JoinClubByInviteCodeAsync(inviteCodeInput, currentUser!.Id);
+        clubJoinMessage = message;
+        clubJoinSuccess = success;
+        if (success)
+        {
+            inviteCodeInput = "";
+            await LoadClubs();
+        }
+        await Task.Delay(4000);
+        clubJoinMessage = "";
+        StateHasChanged();
+    }
+
+    private async Task SearchUsers(ChangeEventArgs e)
+    {
+        chatSearch = e.Value?.ToString() ?? "";
+        if (!UserSession.IsLoggedIn || chatSearch.Length < 1) { searchResults.Clear(); return; }
+        searchResults = await ChatService.GetRecentChatUsersAsync(currentUser!.Id);
+        if (!string.IsNullOrWhiteSpace(chatSearch))
+        {
+            var q = chatSearch.ToLower();
+            searchResults = searchResults.Where(u => u.Username.ToLower().Contains(q) || u.Name.ToLower().Contains(q)).ToList();
+        }
+        StateHasChanged();
+    }
+
+    private async Task OpenChat(UserAccount user)
+    {
+        if (!UserSession.IsLoggedIn) { NavManager.NavigateTo("/auth"); return; }
+        chatWith = user;
+        chatMessages = await ChatService.GetChatMessagesAsync(currentUser!.Id, user.Id);
+        StateHasChanged();
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("swaysHelpers.scrollToBottom", "chat-messages");
+    }
+
+    private async Task SendMessage()
+    {
+        if (chatWith == null || string.IsNullOrWhiteSpace(newMessageText) || !UserSession.IsLoggedIn) return;
+        var msg = await ChatService.SendMessageAsync(currentUser!.Id, chatWith.Id, newMessageText);
+        newMessageText = "";
+        chatMessages.Add(msg);
+        StateHasChanged();
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("swaysHelpers.scrollToBottom", "chat-messages");
+    }
+
+    private async Task HandleChatKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SendMessage();
+    }
+
+    private string GetTimeAgo(DateTime dt)
+    {
+        var ts = DateTime.UtcNow - dt.ToUniversalTime();
+        if (ts.TotalSeconds < 60)  return "just now";
+        if (ts.TotalMinutes < 2)   return "1 minute ago";
+        if (ts.TotalMinutes < 60)  return $"{(int)ts.TotalMinutes} minutes ago";
+        if (ts.TotalHours < 2)     return "1 hour ago";
+        if (ts.TotalHours < 24)    return $"{(int)ts.TotalHours} hours ago";
+        if (ts.TotalDays < 2)      return "1 day ago";
+        if (ts.TotalDays < 30)     return $"{(int)ts.TotalDays} days ago";
+        if (ts.TotalDays < 60)     return "1 month ago";
+        return $"{(int)(ts.TotalDays / 30)} months ago";
+    }
+
+
+    public void Dispose() => UserSession.OnStateChanged -= OnSessionChanged;
+}
+

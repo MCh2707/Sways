@@ -1,0 +1,108 @@
+@using Sways.Models
+@using Sways.Services
+@inject ClubService ClubService
+@inject IJSRuntime JS
+@inject NavigationManager NavManager
+
+@if (Show)
+{
+    <div class="modal-overlay">
+        <div class="modal-content blog-modal">
+            <h2>Create a New Club</h2>
+
+            <div class="form-group">
+                <label>Club Name</label>
+                <input @bind="clubName" class="form-control" placeholder="My Awesome Club..." />
+            </div>
+
+            <div class="form-group">
+                <label>Description</label>
+                <textarea @bind="clubDescription" class="form-control" placeholder="What is this club about?" style="height:80px;"></textarea>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <p style="color:red">@errorMsg</p>
+            }
+
+            @if (createdClub != null)
+            {
+                <div style="background:#f0f4ff;border-radius:12px;padding:15px;margin-top:10px;">
+                    <p style="font-weight:700;color:royalblue;">🎉 Club Created!</p>
+                    <p style="margin:8px 0;">Share this invite code with friends:</p>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <code style="background:#e8f0fe;padding:8px 16px;border-radius:8px;font-size:18px;font-weight:700;letter-spacing:2px;">
+                            @createdClub.InviteCode
+                        </code>
+                        <button @onclick="CopyCode"
+                                style="background:royalblue;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;">
+                            @(copied ? "Copied! ✓" : "Copy Code")
+                        </button>
+                    </div>
+                    <p style="color:#666;font-size:13px;margin-top:8px;">
+                        Members paste this code in the "Add New Community" field on the home page.
+                    </p>
+                </div>
+            }
+
+            <div class="modal-actions" style="margin-top:20px;">
+                <button class="btn btn-secondary" @onclick="Close">@(createdClub != null ? "Done" : "Cancel")</button>
+                @if (createdClub == null)
+                {
+                    <button class="btn btn-primary" @onclick="CreateClub">Create Club</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    private string clubName = "";
+    private string clubDescription = "";
+    private string errorMsg = "";
+    private Club? createdClub = null;
+    private bool copied = false;
+
+    protected override void OnParametersSet()
+    {
+        if (Show)
+        {
+            clubName = "";
+            clubDescription = "";
+            errorMsg = "";
+            createdClub = null;
+            copied = false;
+        }
+    }
+
+    private async Task CreateClub()
+    {
+        if (string.IsNullOrWhiteSpace(clubName))
+        {
+            errorMsg = "Please enter a club name.";
+            return;
+        }
+        createdClub = await ClubService.CreateClubAsync(clubName.Trim(), clubDescription.Trim(), "General", null, null, UserId);
+        await OnCreated.InvokeAsync();
+    }
+
+    private async Task CopyCode()
+    {
+        if (createdClub != null)
+        {
+            await JS.InvokeVoidAsync("swaysHelpers.copyToClipboard", createdClub.InviteCode);
+            copied = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            copied = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Close() => await ShowChanged.InvokeAsync(false);
+}

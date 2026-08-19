@@ -1,0 +1,160 @@
+@page "/auth"
+@page "/login"
+@page "/register"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject AuthService AuthService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+
+<PageTitle>Sways – Log In / Sign Up</PageTitle>
+
+<NavMenu />
+
+<main class="auth-main" style="display:flex;justify-content:center;align-items:center;min-height:80vh;padding:40px 20px;">
+    <div class="auth-card" style="background:var(--panel);border-radius:24px;padding:40px;box-shadow:0 15px 50px var(--shadow);width:100%;max-width:540px;margin:0 auto;border:1px solid var(--line);">
+        @if (showLogin)
+        {
+            <section class="logIn-container" style="display:block;background:transparent;padding:0;box-shadow:none;">
+                <div class="logIn-text" style="text-align:center;margin-bottom:25px;">
+                    <h1 style="font-size:32px;color:var(--accent);margin-bottom:8px;font-weight:800;">Log In</h1>
+                    <p style="color:var(--muted);">Hey, Enter your details to sign in to your account</p>
+                </div>
+
+                <div class="logIn-inputs" style="display:flex;flex-direction:column;gap:15px;">
+                    <input type="text" @bind="loginEmail" placeholder="Enter your mail or username" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    <input type="password" @bind="loginPassword" placeholder="Enter your password" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+
+                    @if (!string.IsNullOrEmpty(loginError))
+                    {
+                        <div class="error-message">@loginError</div>
+                    }
+
+                    <div class="logIn-signUp-container" style="display:flex;justify-content:center;gap:10px;margin-top:10px;">
+                        <p style="color:var(--muted);">Don't have an Account? </p>
+                        <button id="signUp-slider" type="button" @onclick="@(() => { showLogin = false; loginError = ""; })" style="color:var(--accent);font-weight:700;border:none;background:none;cursor:pointer;">Sign Up</button>
+                    </div>
+
+                    <button id="LogInBtn" type="button" @onclick="HandleLogin" style="width:100%;padding:16px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px;">Log In</button>
+                </div>
+            </section>
+        }
+        else
+        {
+            <section class="SignIn-container" style="display:block;background:transparent;padding:0;box-shadow:none;">
+                <div class="logIn-text" style="text-align:center;margin-bottom:25px;">
+                    <h1 style="font-size:32px;color:var(--accent);margin-bottom:8px;font-weight:800;">Sign Up</h1>
+                    <p style="color:var(--muted);">Hey, Enter your details to create your account</p>
+                </div>
+
+                <div class="logIn-inputs" style="display:flex;flex-direction:column;gap:15px;">
+                    <div class="signUp-input-names" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <input type="text" @bind="regFirstName" placeholder="First Name" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                        <input type="text" @bind="regLastName" placeholder="Last Name" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    </div>
+
+                    <input type="date" @bind="regBirthDate" id="Date" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    <input type="text" @bind="regUsername" placeholder="Enter Your Site USERNAME" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    <input type="email" @bind="regEmail" placeholder="Enter your mail" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    <input type="password" @bind="regPassword" placeholder="Enter your new password" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+                    <input type="password" @bind="regConfirmPassword" placeholder="Confirm your new password" style="width:100%;padding:14px 18px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);" />
+
+                    @if (!string.IsNullOrEmpty(regError))
+                    {
+                        <div class="error-message">@regError</div>
+                    }
+
+                    <div class="logIn-signUp-container" style="display:flex;justify-content:center;gap:10px;margin-top:10px;">
+                        <p style="color:var(--muted);">Already have an Account? </p>
+                        <button id="signUp-slider" type="button" @onclick="@(() => { showLogin = true; regError = ""; })" style="color:var(--accent);font-weight:700;border:none;background:none;cursor:pointer;">Log In</button>
+                    </div>
+
+                    <button id="LogInBtn" type="button" @onclick="HandleRegister" style="width:100%;padding:16px;background:var(--accent);color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px;">Create Account</button>
+                </div>
+            </section>
+        }
+    </div>
+</main>
+
+@code {
+    private bool showLogin = true;
+
+    private string loginEmail = "";
+    private string loginPassword = "";
+    private string loginError = "";
+
+    private string regFirstName = "";
+    private string regLastName = "";
+    private string regUsername = "";
+    private string regEmail = "";
+    private string regPassword = "";
+    private string regConfirmPassword = "";
+    private DateTime? regBirthDate;
+    private string regError = "";
+
+    protected override void OnInitialized()
+    {
+        if (UserSession.IsLoggedIn)
+            NavManager.NavigateTo("/");
+    }
+
+    private async Task HandleLogin()
+    {
+        loginError = "";
+        if (string.IsNullOrWhiteSpace(loginEmail) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            loginError = "Please fill in all fields.";
+            return;
+        }
+
+        var (success, message, user) = await AuthService.LoginAsync(loginEmail, loginPassword);
+        if (success && user != null)
+        {
+            UserSession.Login(user);
+            try { await JS.InvokeVoidAsync("localStorage.setItem", "sways-userId", user.Id.ToString()); } catch {}
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            loginError = message;
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        regError = "";
+        if (string.IsNullOrWhiteSpace(regFirstName) || string.IsNullOrWhiteSpace(regUsername) ||
+            string.IsNullOrWhiteSpace(regEmail) || string.IsNullOrWhiteSpace(regPassword))
+        {
+            regError = "Please fill in all required fields.";
+            return;
+        }
+        if (regPassword != regConfirmPassword)
+        {
+            regError = "Passwords do not match.";
+            return;
+        }
+        if (regPassword.Length < 6)
+        {
+            regError = "Password must be at least 6 characters.";
+            return;
+        }
+
+        var (success, message, user) = await AuthService.RegisterAsync(
+            regFirstName, regLastName, regUsername, regEmail, regPassword, regBirthDate);
+
+        if (success && user != null)
+        {
+            UserSession.Login(user);
+            try { await JS.InvokeVoidAsync("localStorage.setItem", "sways-userId", user.Id.ToString()); } catch {}
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            regError = message;
+        }
+    }
+}
+

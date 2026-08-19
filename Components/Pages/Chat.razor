@@ -1,0 +1,224 @@
+@page "/chat"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject ChatService ChatService
+@inject ProfileService ProfileService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Messages & Chat – Sways</PageTitle>
+
+<NavMenu />
+
+@if (loading)
+{
+    <div style="text-align:center;padding:80px;font-size:18px;color:var(--muted);">Loading chats...</div>
+}
+else if (!UserSession.IsLoggedIn)
+{
+    <div style="text-align:center;padding:80px;">
+        <h2 style="color:var(--accent);margin-bottom:15px;">Please Log In to access Direct Messages</h2>
+        <a href="/auth" style="display:inline-block;padding:12px 28px;background:var(--accent);color:white;border-radius:12px;text-decoration:none;font-weight:700;">Log In / Register</a>
+    </div>
+}
+else
+{
+    <main class="chat-page-main">
+        <div class="chat-page-container">
+            <!-- CHAT USER LIST SIDEBAR -->
+            <aside class="chat-user-sidebar @(selectedUser != null ? "hide-mobile" : "")">
+                <div class="chat-sidebar-header">
+                    <h2>Direct Messages</h2>
+                    <input type="text" class="chat-search-input" placeholder="Search users..." @bind="searchQuery" @bind:event="oninput" />
+                </div>
+
+                <div class="chat-user-list">
+                    @if (filteredUsers.Count == 0)
+                    {
+                        <p class="chat-empty-msg">No users found.</p>
+                    }
+                    @foreach (var u in filteredUsers)
+                    {
+                        <div class="chat-user-item @(selectedUser?.Id == u.Id ? "active" : "")" @onclick="() => SelectUser(u)">
+                            <div class="chat-user-avatar" style="background-image:url('@(string.IsNullOrEmpty(u.ProfilePicUrl) ? "/favicon.png" : u.ProfilePicUrl)');">
+                                <div class="chat-online-dot"></div>
+                            </div>
+                            <div class="chat-user-info">
+                                <strong>@u.Username</strong>
+                                <span>@(string.IsNullOrEmpty(u.Name) ? u.Username : u.Name)</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </aside>
+
+            <!-- CHAT THREAD AREA -->
+            <section class="chat-thread-area @(selectedUser == null ? "hide-mobile" : "")">
+                @if (selectedUser == null)
+                {
+                    <div class="chat-placeholder">
+                        <i class='bx bxs-chat' style="font-size:64px;color:var(--accent);"></i>
+                        <h3 style="margin-top:15px;color:var(--text);">Select a conversation</h3>
+                        <p style="color:var(--muted);">Choose a user from the left list to start messaging.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="chat-thread-header">
+                        <button class="chat-back-btn" @onclick="() => selectedUser = null">
+                            <i class='bx bx-left-arrow-alt'></i>
+                        </button>
+                        <div class="chat-thread-user">
+                            <div class="chat-user-avatar" style="background-image:url('@(string.IsNullOrEmpty(selectedUser.ProfilePicUrl) ? "/favicon.png" : selectedUser.ProfilePicUrl)');"></div>
+                            <div>
+                                <strong>@selectedUser.Username</strong>
+                                <span>@(string.IsNullOrEmpty(selectedUser.Name) ? selectedUser.Username : selectedUser.Name)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-messages-container" id="chatScrollArea">
+                        @if (messages.Count == 0)
+                        {
+                            <div class="chat-empty-msg" style="margin:auto;background:var(--panel-soft);padding:20px;border-radius:16px;">
+                                👋 No messages yet with <strong>@selectedUser.Username</strong>. Send a message to start chatting!
+                            </div>
+                        }
+                        @foreach (var msg in messages)
+                        {
+                            bool isMe = msg.SenderId == UserSession.CurrentUser?.Id;
+                            <div class="chat-bubble-row @(isMe ? "outgoing" : "incoming")">
+                                @if (!isMe)
+                                {
+                                    <div class="chat-bubble-avatar" style="background-image:url('@(string.IsNullOrEmpty(selectedUser.ProfilePicUrl) ? "/favicon.png" : selectedUser.ProfilePicUrl)');"></div>
+                                }
+                                <div class="chat-bubble">
+                                    <p>@msg.Content</p>
+                                    <span class="chat-time">@msg.SentAt.ToString("h:mm tt")</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="chat-thread-input">
+                        <input type="text" placeholder="Type a message..." @bind="messageInput" @onkeyup="HandleKeyUp" />
+                        <button class="chat-send-btn" @onclick="SendMessage">
+                            <i class='bx bxs-send'></i>
+                        </button>
+                    </div>
+                }
+            </section>
+        </div>
+    </main>
+}
+
+@code {
+    private bool loading = true;
+    private List<UserAccount> displayUsers = new();
+    private List<UserAccount> allUsers = new();
+    private UserAccount? selectedUser;
+    private List<DirectMessage> messages = new();
+    private string searchQuery = "";
+    private string messageInput = "";
+
+    private List<UserAccount> filteredUsers =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? displayUsers
+            : allUsers.Where(u => u.Id != UserSession.CurrentUser?.Id &&
+                                 (u.Username.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                                  (u.Name != null && u.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)))).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnStateChanged += OnSessionChanged;
+        await LoadChatData();
+    }
+
+    private void OnSessionChanged()
+    {
+        InvokeAsync(LoadChatData);
+    }
+
+    private async Task LoadChatData()
+    {
+        if (!UserSession.IsLoggedIn || UserSession.CurrentUser == null)
+        {
+            loading = false;
+            StateHasChanged();
+            return;
+        }
+
+        int currentId = UserSession.CurrentUser.Id;
+        allUsers = await ProfileService.GetAllUsersAsync();
+
+        var recent = await ChatService.GetRecentChatUsersAsync(currentId);
+        var remainingUsers = allUsers.Where(u => u.Id != currentId && !recent.Any(r => r.Id == u.Id)).ToList();
+
+        displayUsers = new List<UserAccount>();
+        displayUsers.AddRange(recent);
+        displayUsers.AddRange(remainingUsers);
+
+        if (selectedUser == null && displayUsers.Count > 0)
+        {
+            selectedUser = displayUsers.First();
+            messages = await ChatService.GetChatMessagesAsync(currentId, selectedUser.Id);
+        }
+        else if (selectedUser != null)
+        {
+            messages = await ChatService.GetChatMessagesAsync(currentId, selectedUser.Id);
+        }
+
+        loading = false;
+        StateHasChanged();
+        await ScrollBottom();
+    }
+
+    private async Task SelectUser(UserAccount u)
+    {
+        selectedUser = u;
+        if (UserSession.CurrentUser != null && selectedUser != null)
+        {
+            messages = await ChatService.GetChatMessagesAsync(UserSession.CurrentUser.Id, selectedUser.Id);
+            StateHasChanged();
+            await ScrollBottom();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(messageInput) || selectedUser == null || UserSession.CurrentUser == null) return;
+        var text = messageInput;
+        messageInput = "";
+
+        await ChatService.SendMessageAsync(UserSession.CurrentUser.Id, selectedUser.Id, text);
+        messages = await ChatService.GetChatMessagesAsync(UserSession.CurrentUser.Id, selectedUser.Id);
+        StateHasChanged();
+        await ScrollBottom();
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ScrollBottom()
+    {
+        try
+        {
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("swaysHelpers.scrollToBottom", "chatScrollArea");
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnStateChanged -= OnSessionChanged;
+    }
+}

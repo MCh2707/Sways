@@ -1,0 +1,85 @@
+@using Sways.Services
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@implements IDisposable
+
+<nav class="desktop-nav">
+    <ul class="nav-ul">
+        <a href="/" class="@(IsActive("/") ? "active" : "")"><li>Home</li></a>
+        <a href="/clubs" class="@(IsActive("/clubs") ? "active" : "")"><li>Clubs</li></a>
+        <a href="/auth" class="@(IsActive("/auth") ? "active" : "")"><li>Top Users</li></a>
+        <li class="logo"><a href="/" style="text-decoration:none;color:inherit;">Sways</a></li>
+        <a href="/settings" class="@(IsActive("/settings") ? "active" : "")"><li>Settings</li></a>
+        <li class="nav-profile">
+            @if (UserSession.IsLoggedIn && UserSession.CurrentUser != null)
+            {
+                <a href="/profile" class="nav-profile-a @(IsActive("/profile") ? "active" : "")">
+                    <div class="nav-profile-icon" style="background-image:url('@UserSession.CurrentUser.ProfilePicUrl');background-size:cover;background-position:center;"></div>
+                    <h1>@UserSession.CurrentUser.Username</h1>
+                </a>
+            }
+            else
+            {
+                <a href="/auth" class="nav-profile-a @(IsActive("/auth") ? "active" : "")">
+                    <div class="nav-profile-icon" style="display:flex;align-items:center;justify-content:center;"><i class='bx bxs-user-circle' style="font-size:28px;color:white;"></i></div>
+                    <h1>Log In</h1>
+                </a>
+            }
+        </li>
+    </ul>
+</nav>
+
+<div class="mobile-top-bar">
+    <a href="/" class="mobile-logo">Sways</a>
+    <div class="mobile-top-actions">
+        <a href="/settings" class="mobile-top-btn" title="Settings">
+            <i class='bx bx-cog'></i>
+        </a>
+    </div>
+</div>
+
+<nav class="mobile-bottom-nav">
+    <a href="/" class="mobile-nav-item @(IsActive("/") ? "active" : "")" title="Home">
+        <i class='bx bxs-home'></i>
+    </a>
+    <a href="/chat" class="mobile-nav-item @(IsActive("/chat") ? "active" : "")" title="Chat">
+        <i class='bx bxs-chat'></i>
+    </a>
+    <a href="/clubs" class="mobile-nav-item @(IsActive("/clubs") ? "active" : "")" title="Server">
+        <i class='bx bxs-server'></i>
+    </a>
+    <a href="@(UserSession.IsLoggedIn ? "/profile" : "/auth")" class="mobile-nav-item @(IsActive("/profile") || IsActive("/auth") ? "active" : "")" title="Profile">
+        @if (UserSession.IsLoggedIn && UserSession.CurrentUser != null && !string.IsNullOrEmpty(UserSession.CurrentUser.ProfilePicUrl))
+        {
+            <div class="mobile-nav-avatar" style="background-image:url('@UserSession.CurrentUser.ProfilePicUrl');"></div>
+        }
+        else
+        {
+            <i class='bx bxs-user-circle'></i>
+        }
+    </a>
+</nav>
+
+@code {
+    protected override void OnInitialized()
+    {
+        UserSession.OnStateChanged += OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsActive(string path)
+    {
+        var relative = NavManager.ToBaseRelativePath(NavManager.Uri);
+        if (path == "/") return string.IsNullOrEmpty(relative);
+        return relative.StartsWith(path.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnStateChanged -= OnStateChanged;
+    }
+}

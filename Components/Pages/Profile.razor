@@ -1,0 +1,361 @@
+@page "/profile"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject ProfileService ProfileService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+
+<PageTitle>Profile – Sways</PageTitle>
+
+<NavMenu />
+
+@if (!UserSession.IsLoggedIn)
+{
+    <div style="text-align:center;padding:60px 20px;">
+        <h2 style="color:royalblue;">You need to be logged in.</h2>
+        <a href="/auth" style="display:inline-block;margin-top:20px;padding:12px 30px;background:royalblue;color:white;border-radius:10px;text-decoration:none;font-weight:700;">
+            Log In / Register
+        </a>
+    </div>
+}
+else if (currentUser == null)
+{
+    <p style="text-align:center;padding:40px;">Loading...</p>
+}
+else
+{
+    <header>
+        <div class="profile-banner" style="background-color:royalblue;background-image:url('@currentUser.BannerUrl');background-size:cover;background-position:center;"></div>
+        <div class="profile-container">
+            <div class="profile-pic" style="background-image:url('@currentUser.ProfilePicUrl');background-size:cover;background-position:center;">
+                <div class="profile-status"></div>
+            </div>
+            <div class="profile-gap">
+                <div>
+                    <h1 style="display:flex;align-items:center;gap:8px;">
+                        @currentUser.Username
+                        <span style="font-size:20px;">@equippedBadgeEmojis</span>
+                    </h1>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#555;">
+                        @if (!string.IsNullOrEmpty(currentUser.EducationLevel))
+                        {
+                            <span style="background:rgba(65,105,225,0.1);color:royalblue;padding:3px 10px;border-radius:12px;font-weight:600;">
+                                🎓 @(currentUser.EducationLevel == "school" ? (string.IsNullOrEmpty(currentUser.SchoolName) ? "School" : currentUser.SchoolName) :
+                                     currentUser.EducationLevel == "university" ? (string.IsNullOrEmpty(currentUser.UniversityName) ? "University" : currentUser.UniversityName) : currentUser.EducationLevel)
+                            </span>
+                        }
+                        @if (!string.IsNullOrEmpty(currentUser.WorkplaceCompany))
+                        {
+                            <span style="background:rgba(34,197,94,0.1);color:#16a34a;padding:3px 10px;border-radius:12px;font-weight:600;">
+                                💼 @currentUser.WorkplaceCompany @(!string.IsNullOrEmpty(currentUser.WorkplacePosition) ? $"({currentUser.WorkplacePosition})" : "")
+                            </span>
+                        }
+                        @if (!currentUser.HideLocation && !string.IsNullOrEmpty(currentUser.City))
+                        {
+                            <span style="background:rgba(234,179,8,0.1);color:#ca8a04;padding:3px 10px;border-radius:12px;font-weight:600;">
+                                📍 @currentUser.City, @currentUser.Country
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <div class="profile-follower-container" @onclick="OpenFollowersModal" style="cursor:pointer;">
+                    <ol>
+                        <li class="profile-follower-count">@followingCount</li>
+                        <li class="profile-follower-count">@followersCount</li>
+                        <li class="profile-follower-count">@postCount</li>
+                    </ol>
+                    <ul>
+                        <li>Following</li>
+                        <li>Followers</li>
+                        <li>Posts</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="profile-grid">
+        <section class="profile-info">
+            <h1 class="profile-name">@(string.IsNullOrEmpty(currentUser.Name) ? currentUser.Username : currentUser.Name)</h1>
+            <div class="profile-pic-container">
+                <div class="profile-pic-info" style="background-image:url('@currentUser.ProfilePicUrl');background-size:cover;"></div>
+                <div class="profile-username">@@@currentUser.Username</div>
+            </div>
+            <div id="profile-gender">@currentUser.Gender</div>
+
+            <div class="profile-mainBtns btnContainer" style="margin-top:20px;">
+                <a href="/settings" style="width:100%;"><button class="edit userProfile">⚙️ Edit User Profile</button></a>
+                <button class="edit" style="background:#ef4444;" @onclick="Logout">Exit / Log Out</button>
+            </div>
+        </section>
+
+        <section class="socials">
+            <h1>Social Links</h1>
+            <div class="social-links">
+                <ul>
+                    @if (!string.IsNullOrEmpty(currentUser.TwitterLink) && currentUser.TwitterLink != "#")
+                    { <li><a href="@currentUser.TwitterLink" target="_blank">🐦 Twitter / X</a></li> }
+                    @if (!string.IsNullOrEmpty(currentUser.InstagramLink) && currentUser.InstagramLink != "#")
+                    { <li><a href="@currentUser.InstagramLink" target="_blank">📸 Instagram</a></li> }
+                    @if (!string.IsNullOrEmpty(currentUser.TikTokLink) && currentUser.TikTokLink != "#")
+                    { <li><a href="@currentUser.TikTokLink" target="_blank">🎵 TikTok</a></li> }
+                    @if (!string.IsNullOrEmpty(currentUser.SpotifyLink) && currentUser.SpotifyLink != "#")
+                    { <li><a href="@currentUser.SpotifyLink" target="_blank">🎵 Spotify</a></li> }
+                    @if (!string.IsNullOrEmpty(currentUser.FacebookLink) && currentUser.FacebookLink != "#")
+                    { <li><a href="@currentUser.FacebookLink" target="_blank">📘 Facebook</a></li> }
+                    @if (!string.IsNullOrEmpty(currentUser.DiscordLink) && currentUser.DiscordLink != "#")
+                    { <li><a href="@currentUser.DiscordLink" target="_blank">💬 Discord: @currentUser.DiscordLink</a></li> }
+                    @if (!currentUser.HideEmail && !string.IsNullOrEmpty(currentUser.Email))
+                    { <li><a href="mailto:@currentUser.Email">✉️ @currentUser.Email</a></li> }
+                    @if (!HasSocialLinks())
+                    { <li style="color:#ccc;font-style:italic;">No social links added yet. Add links in Settings!</li> }
+                </ul>
+            </div>
+        </section>
+
+        <section class="about">
+            <h1>About Me</h1>
+            <p>@(string.IsNullOrEmpty(currentUser.Bio) ? currentUser.AboutMe : currentUser.Bio)</p>
+        </section>
+    </main>
+
+    <div class="add-blog btnContainer" style="margin:20px 40px;">
+        <button class="edit" id="add-blogBtn" @onclick="OpenAddBlogModal">✏️ Add Blog Post</button>
+        <button class="edit" id="pool-blogBtn" @onclick="() => showPollModal = true">📊 Add Poll Post</button>
+    </div>
+
+    <div class="posts-list" style="padding:0 40px 40px;">
+        @if (blogPosts.Count == 0)
+        {
+            <div style="text-align:center;padding:40px;color:#999;background:white;border-radius:20px;">
+                <p style="font-size:20px;">No posts uploaded yet. Create your first post!</p>
+            </div>
+        }
+
+        @foreach (var post in blogPosts)
+        {
+            <section class="post">
+                <div class="post-user-container">
+                    <div class="post-profile">
+                        <div class="post-profile-pic" style="background-image:url('@currentUser.ProfilePicUrl');background-size:cover;"></div>
+                        <h1>@currentUser.Username</h1>
+                    </div>
+                    <p style="font-size:13px;color:var(--muted, #888);">Posted @GetTimeAgo(post.DatePosted) @(post.LastEdited.HasValue ? $"• edited {GetTimeAgo(post.LastEdited.Value)}" : "")</p>
+                </div>
+
+                <section class="post-section">
+                    <div class="post-container" @onclick="() => OpenEditBlogModal(post)" style="cursor:pointer;flex:1;">
+                        <div class="post-h2" style="display:flex;justify-content:space-between;align-items:center;">
+                            <h2>@post.Title</h2>
+                            <h2 style="font-size:13px;color:#999;">@post.Visibility</h2>
+                        </div>
+                        <div class="post-blog">
+                            <p style="white-space:pre-wrap;">@post.Content</p>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(post.MediaInfo))
+                    {
+                        <section class="post-media">
+                            <p>@post.MediaInfo</p>
+                        </section>
+                    }
+                </section>
+
+                <div class="react-bar">
+                    <button @onclick="() => ToggleLikeBlog(post)" class="@(HasLikedBlog(post) ? "liked-btn" : "")">
+                        ❤️ @post.Likes.Count @(post.Likes.Count == 1 ? "Like" : "Likes")
+                    </button>
+                    <button @onclick="() => ToggleCommentsBlog(post.Id)">
+                        💬 @post.Comments.Count @(post.Comments.Count == 1 ? "Comment" : "Comments")
+                    </button>
+                    <button @onclick="() => SharePost(post.Id, false)">
+                        🔗 Share
+                    </button>
+                </div>
+
+                @if (openCommentPostId == post.Id)
+                {
+                    <div style="padding:15px;border-top:1px solid #eee;margin-top:10px;">
+                        @foreach (var c in post.Comments.OrderByDescending(x => x.CreatedAt))
+                        {
+                            <div style="padding:8px 0;border-bottom:1px solid #f5f5f5;">
+                                <strong>@(c.User?.Username ?? "user")</strong>
+                                <span style="color:var(--muted, #999);font-size:12px;margin-left:8px;">@GetTimeAgo(c.CreatedAt)</span>
+                                <p style="margin-top:4px;">@c.Content</p>
+                            </div>
+                        }
+                        <div style="display:flex;gap:10px;margin-top:12px;">
+                            <input style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;"
+                                   @bind="commentText" placeholder="Write a comment..." />
+                            <button @onclick="() => SubmitCommentBlog(post.Id)"
+                                    style="background:royalblue;color:white;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;">
+                                Post
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(shareMessage) && sharePostId == post.Id)
+                {
+                    <div style="color:green;padding:8px;text-align:center;">@shareMessage</div>
+                }
+            </section>
+        }
+    </div>
+    
+    <Sways.Components.ProfileEditModal
+        @bind-Show="showProfileModal"
+        Profile="currentUser"
+        OnSaved="LoadData" />
+
+    <Sways.Components.BlogPostModal
+        @bind-Show="showBlogModal"
+        Post="currentBlogPost"
+        IsEditMode="isEditMode"
+        OnSaved="LoadData" />
+
+    <Sways.Components.PollPostModal
+        @bind-Show="showPollModal"
+        UserId="currentUser.Id"
+        OnSaved="LoadData" />
+
+    <Sways.Components.FollowersModal
+        @bind-Show="showFollowersModal"
+        ProfileUserId="currentUser.Id"
+        CurrentUserId="currentUser.Id"
+        OnClosed="LoadData" />
+}
+
+@code {
+    private UserAccount? currentUser;
+    private List<BlogPost> blogPosts = new();
+    private int followersCount;
+    private int followingCount;
+    private int postCount;
+    private string equippedBadgeEmojis = "";
+
+    private bool showProfileModal;
+    private bool showBlogModal;
+    private bool showPollModal;
+    private bool showFollowersModal;
+    private bool isEditMode;
+    private BlogPost currentBlogPost = new();
+
+    private int openCommentPostId = -1;
+    private string commentText = "";
+    private string shareMessage = "";
+    private int sharePostId = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnStateChanged += OnSessionChanged;
+        await LoadData();
+    }
+
+    private void OnSessionChanged()
+    {
+        currentUser = UserSession.CurrentUser;
+        InvokeAsync(LoadData);
+    }
+
+    private async Task LoadData()
+    {
+        currentUser = UserSession.CurrentUser;
+        if (currentUser == null) return;
+
+        currentUser = await ProfileService.GetUserProfileAsync(currentUser.Id);
+        blogPosts = await ProfileService.GetUserBlogPostsAsync(currentUser.Id);
+        var (fc, fw, pc) = await ProfileService.GetUserStatsAsync(currentUser.Id);
+        followersCount = fc;
+        followingCount = fw;
+        postCount = pc;
+
+        var achievements = await ProfileService.GetAchievementsAsync(currentUser.Id);
+        equippedBadgeEmojis = string.Join(" ", achievements.Where(a => a.IsEquipped).Select(a => a.Emoji));
+
+        StateHasChanged();
+    }
+
+    private void OpenAddBlogModal()
+    {
+        currentBlogPost = new BlogPost { UserId = currentUser!.Id };
+        isEditMode = false;
+        showBlogModal = true;
+    }
+
+    private void OpenEditBlogModal(BlogPost post)
+    {
+        currentBlogPost = post;
+        isEditMode = true;
+        showBlogModal = true;
+    }
+
+    private void OpenFollowersModal() => showFollowersModal = true;
+
+    private async Task ToggleLikeBlog(BlogPost post)
+    {
+        if (currentUser == null) return;
+        await ProfileService.ToggleLikeBlogAsync(post.Id, currentUser.Id);
+        await LoadData();
+    }
+
+    private bool HasLikedBlog(BlogPost post)
+        => currentUser != null && post.Likes.Any(l => l.UserId == currentUser.Id);
+
+    private void ToggleCommentsBlog(int postId)
+    {
+        openCommentPostId = openCommentPostId == postId ? -1 : postId;
+        commentText = "";
+    }
+
+    private async Task SubmitCommentBlog(int postId)
+    {
+        if (currentUser == null || string.IsNullOrWhiteSpace(commentText)) return;
+        await ProfileService.AddCommentToBlogAsync(postId, currentUser.Id, commentText);
+        commentText = "";
+        await LoadData();
+    }
+
+    private async Task SharePost(int postId, bool isPoll)
+    {
+        sharePostId = postId;
+        shareMessage = "✅ Link copied to clipboard!";
+        await Task.Delay(3000);
+        shareMessage = "";
+        StateHasChanged();
+    }
+
+    private void Logout()
+    {
+        UserSession.Logout();
+        NavManager.NavigateTo("/auth");
+    }
+
+    private bool HasSocialLinks() =>
+        (!string.IsNullOrEmpty(currentUser?.TwitterLink) && currentUser.TwitterLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.InstagramLink) && currentUser.InstagramLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.DiscordLink) && currentUser.DiscordLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.MailLink) && currentUser.MailLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.SpotifyLink) && currentUser.SpotifyLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.TikTokLink) && currentUser.TikTokLink != "#") ||
+        (!string.IsNullOrEmpty(currentUser?.FacebookLink) && currentUser.FacebookLink != "#");
+
+    private string GetTimeAgo(DateTime dt)
+    {
+        var ts = DateTime.UtcNow - dt.ToUniversalTime();
+        if (ts.TotalSeconds < 60)  return "just now";
+        if (ts.TotalMinutes < 2)   return "1 minute ago";
+        if (ts.TotalMinutes < 60)  return $"{(int)ts.TotalMinutes} minutes ago";
+        if (ts.TotalHours < 2)     return "1 hour ago";
+        if (ts.TotalHours < 24)    return $"{(int)ts.TotalHours} hours ago";
+        if (ts.TotalDays < 2)      return "1 day ago";
+        if (ts.TotalDays < 30)     return $"{(int)ts.TotalDays} days ago";
+        if (ts.TotalDays < 60)     return "1 month ago";
+        return $"{(int)(ts.TotalDays / 30)} months ago";
+    }
+
+    public void Dispose() => UserSession.OnStateChanged -= OnSessionChanged;
+}
+

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="Sways.styles.css" />
+    <link rel="stylesheet" href="css/nav.css" />
+    <link rel="stylesheet" href="css/home.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/registration.css" />
+    <link rel="stylesheet" href="css/settings.css" />
+    <link rel="stylesheet" href="css/club.css" />
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.swaysSession = {
+            setUserId: function (id) {
+                localStorage.setItem('sways-userId', id);
+            },
+            getUserId: function () {
+                return localStorage.getItem('sways-userId');
+            },
+            clearUserId: function () {
+                localStorage.removeItem('sways-userId');
+            }
+        };
+        window.swaysHelpers = {
+            copyToClipboard: function (text) {
+                navigator.clipboard.writeText(text).catch(function() {
+                    var el = document.createElement('textarea');
+                    el.value = text;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                });
+            },
+            scrollToBottom: function (id) {
+                var el = document.getElementById(id);
+                if (el) el.scrollTop = el.scrollHeight;
+            },
+            renderChart: function (canvasId, labels, viewsData, likesData) {
+                var el = document.getElementById(canvasId);
+                if (!el) return;
+                var ctx = el.getContext('2d');
+                if (window[canvasId + '_instance']) {
+                    window[canvasId + '_instance'].destroy();
+                }
+                window[canvasId + '_instance'] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Views',
+                            data: viewsData,
+                            backgroundColor: 'rgba(96,165,250,0.85)',
+                            borderRadius: 6
+                        }, {
+                            label: 'Likes',
+                            data: likesData,
+                            backgroundColor: 'rgba(244,114,182,0.85)',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        };
+    </script>
+</body>
+
+</html>

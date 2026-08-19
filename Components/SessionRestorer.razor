@@ -1,0 +1,60 @@
+@using Sways.Services
+@inject IJSRuntime JS
+@inject UserSession UserSession
+@inject AuthService AuthService
+
+@code {
+    private bool hasRestored = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try {
+            await JS.InvokeVoidAsync("window.initTheme");
+        } catch {}
+
+        if (firstRender && !hasRestored)
+        {
+            hasRestored = true;
+
+            if (!UserSession.IsLoggedIn)
+            {
+                try
+                {
+                    var savedIdStr = await JS.InvokeAsync<string>("localStorage.getItem", "sways-userId");
+                    if (!string.IsNullOrEmpty(savedIdStr) && int.TryParse(savedIdStr, out int userId))
+                    {
+                        var user = await AuthService.GetUserByIdAsync(userId);
+                        if (user != null)
+                        {
+                            UserSession.Login(user);
+                            if (!string.IsNullOrEmpty(user.ThemeMode) && !string.IsNullOrEmpty(user.AccentColor))
+                            {
+                                try
+                                {
+                                    await JS.InvokeVoidAsync("saveTheme", user.ThemeMode, user.AccentColor);
+                                }
+                                catch {}
+                            }
+                            StateHasChanged();
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+            else if (UserSession.CurrentUser != null)
+            {
+                var u = UserSession.CurrentUser;
+                if (!string.IsNullOrEmpty(u.ThemeMode) && !string.IsNullOrEmpty(u.AccentColor))
+                {
+                    try
+                    {
+                        await JS.InvokeVoidAsync("saveTheme", u.ThemeMode, u.AccentColor);
+                    }
+                    catch {}
+                }
+            }
+        }
+    }
+}

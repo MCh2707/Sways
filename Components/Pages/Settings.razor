@@ -1,0 +1,679 @@
+@page "/settings"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject ProfileService ProfileService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+@inject FileUploadService FileUploadService
+
+<PageTitle>Settings – Sways</PageTitle>
+
+<NavMenu />
+
+@if (!UserSession.IsLoggedIn || currentUser == null)
+{
+    <div style="text-align:center;padding:60px 20px;">
+        <h2 style="color:royalblue;">You need to be logged in to view Settings.</h2>
+        <a href="/auth" style="display:inline-block;margin-top:20px;padding:12px 30px;background:royalblue;color:white;border-radius:10px;text-decoration:none;font-weight:700;">
+            Log In / Register
+        </a>
+    </div>
+}
+else
+{
+    <main class="settings-main">
+        <section class="tools">
+            <ul>
+                <li class="@(activeTab == "profile" ? "active" : "")" @onclick='() => SwitchTab("profile")'>
+                    <i class="bx bxs-user-circle"></i> Profile
+                </li>
+                <li class="@(activeTab == "account" ? "active" : "")" @onclick='() => SwitchTab("account")'>
+                    <i class="bx bxs-user-detail"></i> Account
+                </li>
+                <li class="@(activeTab == "appearance" ? "active" : "")" @onclick='() => SwitchTab("appearance")'>
+                    <i class="bx bx-palette"></i> Appearance
+                </li>
+                <li class="@(activeTab == "activity" ? "active" : "")" @onclick='() => SwitchTab("activity")'>
+                    <i class="bx bxs-contact"></i> Activity
+                </li>
+                <li class="@(activeTab == "achievements" ? "active" : "")" @onclick='() => SwitchTab("achievements")'>
+                    <i class="bx bx-medal"></i> Achievements
+                </li>
+                <li class="@(activeTab == "privacy" ? "active" : "")" @onclick='() => SwitchTab("privacy")'>
+                    <i class="bx bx-check-shield"></i> Privacy
+                </li>
+                <li class="@(activeTab == "premium" ? "active" : "")" @onclick='() => SwitchTab("premium")'>
+                    <i class="bx bxl-sketch"></i> Premium
+                </li>
+            </ul>
+        </section>
+
+        <section class="profile" style="display:@(activeTab == "profile" ? "block" : "none");">
+            <div class="profile-pic-banner" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:22px;align-items:end;margin-bottom:28px;">
+                <div class="profile-change-container" style="position:relative;">
+                    <div class="profile-banner" style="width:100%;min-height:180px;border-radius:24px;background-color:var(--accent);background-image:url('@currentUser.BannerUrl');background-size:cover;background-position:center;"></div>
+                    <div class="profile-pic" style="width:110px;height:110px;border-radius:50%;border:5px solid var(--panel);background-color:var(--accent);background-image:url('@currentUser.ProfilePicUrl');background-size:cover;background-position:center;box-shadow:0 10px 30px rgba(0,0,0,0.15);margin:-40px 20px 0 20px;"></div>
+                </div>
+
+                <div class="profile-change-btns" style="display:grid;gap:14px;width:100%;max-width:280px;">
+                    <label id="changeBannerBtn" class="edit" style="cursor:pointer;margin:0;width:100%;">
+                        Change Profile Banner
+                        <InputFile OnChange="OnBannerUploaded" accept="image/*" style="display:none;" />
+                    </label>
+                    <label id="changePicBtn" class="edit" style="cursor:pointer;margin:0;width:100%;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);">
+                        Change Profile Picture
+                        <InputFile OnChange="OnAvatarUploaded" accept="image/*" style="display:none;" />
+                    </label>
+                </div>
+            </div>
+
+            <h1 style="padding:20px 0 10px 0;font-size:24px;font-weight:800;">Edit Personal Information</h1>
+            <div class="profile-edit-inputs" style="display:grid;gap:20px;">
+                <div class="profile-names" style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+                    <input type="text" @bind="currentUser.FirstName" placeholder="First Name" />
+                    <input type="text" @bind="currentUser.LastName" placeholder="Last Name" />
+                </div>
+
+                <input type="text" @bind="currentUser.Username" placeholder="USERNAME" />
+
+                <textarea id="bio" @bind="currentUser.Bio" placeholder="bio... (350 max)" class="text-input" style="height:90px;width:100%;"></textarea>
+
+                <div class="location" style="width:100%;">
+                    <div class="education-container">
+                        <label style="display:block;font-weight:700;margin-bottom:6px;">Gender</label>
+                        <select id="gender" @bind="currentUser.Gender" class="location-select" style="width:100%;">
+                            <option value="she/her">Female (she/her)</option>
+                            <option value="he/him">Male (he/him)</option>
+                            <option value="they/them">Rather not say / Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h1 class="section-title" style="font-size:22px;font-weight:800;margin-top:15px;">Additional info</h1>
+
+                <div class="additional-info-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:15px;">
+                    <div class="field-card">
+                        <label style="font-weight:700;display:block;margin-bottom:6px;">Country</label>
+                        <select value="@currentUser.Country" @onchange="OnCountryChanged" class="location-select">
+                            <option value="Georgia">Georgia 🇬🇪</option>
+                            <option value="England">England / UK 🇬🇧</option>
+                            <option value="USA">USA 🇺🇸</option>
+                            <option value="Germany">Germany 🇩🇪</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="field-card">
+                        <label style="font-weight:700;display:block;margin-bottom:6px;">City / District</label>
+                        <select @bind="currentUser.City" class="location-select">
+                            <option value="">Select a city</option>
+                            @foreach (var city in availableCities)
+                            {
+                                <option value="@city">@city</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="field-card">
+                        <label style="font-weight:700;display:block;margin-bottom:6px;">Education Level</label>
+                        <select @bind="currentUser.EducationLevel" class="education-select">
+                            <option value="school">School</option>
+                            <option value="college">College</option>
+                            <option value="university">University</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    @if (currentUser.EducationLevel == "school")
+                    {
+                        <div class="field-card" style="grid-column: span 2;">
+                            <label style="font-weight:700;display:block;margin-bottom:6px;">School Details</label>
+                            <div style="display:grid;gap:10px;grid-template-columns:1fr 1fr;">
+                                <input type="text" @bind="currentUser.SchoolName" placeholder="School Name / #" />
+                                <input type="text" @bind="currentUser.SchoolAddress" placeholder="School Address" />
+                                <input type="text" @bind="currentUser.SchoolClass" placeholder="Class / Grade (e.g. 10B)" />
+                                <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                                    <input type="checkbox" @bind="currentUser.ShowSchoolPublicly" style="width:16px;height:16px;" />
+                                    Show school info publicly
+                                </label>
+                            </div>
+                        </div>
+                    }
+                    else if (currentUser.EducationLevel == "university")
+                    {
+                        <div class="field-card" style="grid-column: span 2;">
+                            <label style="font-weight:700;display:block;margin-bottom:6px;">University Details</label>
+                            <div style="display:grid;gap:10px;grid-template-columns:1fr 1fr;">
+                                <input type="text" @bind="currentUser.UniversityName" placeholder="University Name" />
+                                <input type="text" @bind="currentUser.UniversityAddress" placeholder="University Address" />
+                                <input type="email" @bind="currentUser.UniversityEmail" placeholder="Student Email (.edu)" style="grid-column: span 2;" />
+                            </div>
+                        </div>
+                    }
+                    else if (currentUser.EducationLevel == "college")
+                    {
+                        <div class="field-card" style="grid-column: span 2;">
+                            <label style="font-weight:700;display:block;margin-bottom:6px;">College Details</label>
+                            <div style="display:grid;gap:10px;grid-template-columns:1fr 1fr;">
+                                <input type="text" @bind="currentUser.CollegeName" placeholder="College Name" />
+                                <input type="text" @bind="currentUser.CollegeAddress" placeholder="College Address" />
+                                <input type="email" @bind="currentUser.CollegeEmail" placeholder="Student Email" style="grid-column: span 2;" />
+                            </div>
+                        </div>
+                    }
+
+                    <div class="field-card">
+                        <label style="font-weight:700;display:block;margin-bottom:6px;">Workplace</label>
+                        <input type="text" @bind="currentUser.WorkplaceCompany" class="text-input" placeholder="Company Name" />
+                        <input type="text" @bind="currentUser.WorkplacePosition" class="text-input" placeholder="Position / Role" style="margin-top:8px;" />
+                    </div>
+
+                    <div class="field-card">
+                        <label style="font-weight:700;display:block;margin-bottom:6px;">Languages</label>
+                        <input type="text" @bind="currentUser.Languages" class="text-input" placeholder="e.g. Georgian, English, German" />
+                    </div>
+                </div>
+
+                <h1 class="section-title" style="font-size:22px;font-weight:800;margin-top:15px;">Social Links</h1>
+                <div class="socials" style="display:grid;gap:12px;">
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">Twitter / X</label>
+                        <input type="url" @bind="currentUser.TwitterLink" placeholder="https://twitter.com/username" />
+                    </div>
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">TikTok</label>
+                        <input type="url" @bind="currentUser.TikTokLink" placeholder="https://www.tiktok.com/@@username" />
+                    </div>
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">Instagram</label>
+                        <input type="url" @bind="currentUser.InstagramLink" placeholder="https://www.instagram.com/username" />
+                    </div>
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">Spotify</label>
+                        <input type="url" @bind="currentUser.SpotifyLink" placeholder="https://open.spotify.com/user/id" />
+                    </div>
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">Facebook</label>
+                        <input type="url" @bind="currentUser.FacebookLink" placeholder="https://www.facebook.com/username" />
+                    </div>
+                    <div class="social-row" style="display:grid;grid-template-columns:140px 1fr;align-items:center;gap:10px;">
+                        <label style="font-weight:700;">Discord</label>
+                        <input type="text" @bind="currentUser.DiscordLink" placeholder="Discord Tag / Link" />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(saveMessage))
+                {
+                    <div style="color:green;padding:10px;text-align:center;font-weight:700;">@saveMessage</div>
+                }
+
+                <button type="button" @onclick="SaveProfile" style="background:var(--accent);color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;margin-top:20px;">
+                    Save Profile Changes
+                </button>
+            </div>
+        </section>
+
+        <section class="account" style="display:@(activeTab == "account" ? "grid" : "none");">
+            <div class="account-header">
+                <div>
+                    <p class="eyebrow">Security</p>
+                    <h1>Account Settings</h1>
+                </div>
+            </div>
+
+            <div class="account-panel">
+                <label for="changePas">Change Password</label>
+                <input type="password" id="changePas" @bind="newPassword" placeholder="Enter new password" />
+                @if (!string.IsNullOrEmpty(pwdMsg))
+                {
+                    <p style="color:green;font-size:14px;margin-top:5px;">@pwdMsg</p>
+                }
+                <button type="button" @onclick="SavePassword" style="background:royalblue;color:white;width:auto;margin-top:10px;padding:10px 20px;">Update Password</button>
+            </div>
+
+            <div class="account-actions">
+                <button class="logOutBtn" type="button" @onclick="Logout">Log Out</button>
+                <button class="deleteBtn" type="button" @onclick="DeleteAccount">Delete Account</button>
+            </div>
+        </section>
+
+        <section class="appearance" style="display:@(activeTab == "appearance" ? "grid" : "none");">
+            <div class="appearance-header">
+                <div>
+                    <p class="eyebrow">Display</p>
+                    <h1>Appearance & Theme</h1>
+                </div>
+            </div>
+
+            <div class="appearance-panel">
+                <div class="appearance-group">
+                    <label>Mode</label>
+                    <div class="mode-options">
+                        <label class="option-pill @(themeMode == "open" ? "active" : "")">
+                            <input type="radio" name="themeMode" value="open" checked="@(themeMode == "open")"
+                                   @onchange="@(() => SetTheme("open", accentColor))" />
+                            <span>☀️ Open mode (Light)</span>
+                        </label>
+                        <label class="option-pill @(themeMode == "dark" ? "active" : "")">
+                            <input type="radio" name="themeMode" value="dark" checked="@(themeMode == "dark")"
+                                   @onchange="@(() => SetTheme("dark", accentColor))" />
+                            <span>🌙 Dark mode</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="appearance-group">
+                    <label>Accent Color</label>
+                    <div class="color-options">
+                        <label class="color-swatch pink @(accentColor == "pink" ? "active" : "")">
+                            <input type="radio" name="accentColor" value="pink" checked="@(accentColor == "pink")"
+                                   @onchange="@(() => SetTheme(themeMode, "pink"))" />
+                            <span></span>
+                        </label>
+                        <label class="color-swatch blue @(accentColor == "blue" ? "active" : "")">
+                            <input type="radio" name="accentColor" value="blue" checked="@(accentColor == "blue")"
+                                   @onchange="@(() => SetTheme(themeMode, "blue"))" />
+                            <span></span>
+                        </label>
+                        <label class="color-swatch green @(accentColor == "green" ? "active" : "")">
+                            <input type="radio" name="accentColor" value="green" checked="@(accentColor == "green")"
+                                   @onchange="@(() => SetTheme(themeMode, "green"))" />
+                            <span></span>
+                        </label>
+                        <label class="color-swatch purple @(accentColor == "purple" ? "active" : "")">
+                            <input type="radio" name="accentColor" value="purple" checked="@(accentColor == "purple")"
+                                   @onchange="@(() => SetTheme(themeMode, "purple"))" />
+                            <span></span>
+                        </label>
+                        <label class="color-swatch orange @(accentColor == "orange" ? "active" : "")">
+                            <input type="radio" name="accentColor" value="orange" checked="@(accentColor == "orange")"
+                                   @onchange="@(() => SetTheme(themeMode, "orange"))" />
+                            <span></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="appearance-group">
+                    <label for="appLanguage">Language</label>
+                    <select id="appLanguage" @bind="selectedLanguage" class="appearance-select">
+                        <option value="english">English 🇬🇧</option>
+                        <option value="georgian">Georgian 🇬🇪</option>
+                        <option value="german">German 🇩🇪</option>
+                        <option value="russian">Russian 🇷🇺</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="activity" style="display:@(activeTab == "activity" ? "block" : "none");">
+            <div class="account-header">
+                <div>
+                    <p class="eyebrow">Engagement</p>
+                    <h1>My Activity Analytics</h1>
+                </div>
+            </div>
+
+            <div class="activity-grid">
+                <div class="activity-list">
+                    <h2 style="font-size:18px;font-weight:700;">Summary</h2>
+                    <ul>
+                        <li>Published articles: <strong>@postCount</strong></li>
+                        <li>Likes received: <strong>@totalLikesCount</strong></li>
+                        <li>Comments: <strong>@totalCommentsCount</strong></li>
+                        <li>Badges received: <strong>@unlockedBadgesCount</strong></li>
+                        <li>Followers: <strong>@followersCount</strong></li>
+                    </ul>
+                </div>
+
+                <div class="charts">
+                    <h2 style="font-size:18px;font-weight:700;margin-bottom:10px;">Post Views & Likes chart</h2>
+                    <canvas id="viewsChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="achievements" style="display:@(activeTab == "achievements" ? "block" : "none");">
+            <div class="account-header">
+                <div>
+                    <p class="eyebrow">Progress</p>
+                    <h1>My Achievements</h1>
+                </div>
+            </div>
+
+            <div class="achievements-panel">
+                <div class="achievement-summary">
+                    <div class="progress-title">@unlockedBadgesCount / @achievements.Count unlocked</div>
+                    <div class="progress-bar-outer">
+                        <div class="progress-bar-inner" style="width:@(progressPercentage)%;"></div>
+                    </div>
+                    <div class="progress-percent">@(progressPercentage)%</div>
+                </div>
+
+                <h2 style="font-size:18px;font-weight:700;">Badges (Click to view detail & Equip)</h2>
+                <div class="badges-grid">
+                    @foreach (var badge in achievements)
+                    {
+                        <div class="badge-card @(badge.IsUnlocked ? "unlocked" : "locked") @(badge.IsEquipped ? "equipped" : "") @(selectedBadge?.Id == badge.Id ? "selected" : "")"
+                             @onclick="() => SelectBadge(badge)">
+                            <div class="badge-emoji">@badge.Emoji</div>
+                            <div class="badge-body" style="flex:1;">
+                                <div class="badge-title" style="display:flex;justify-content:space-between;align-items:center;">
+                                    <span>@badge.Title</span>
+                                    <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.1);text-transform:uppercase;">@badge.Rarity</span>
+                                </div>
+                                <div class="badge-desc">@badge.Description</div>
+                                @if (badge.IsEquipped)
+                                {
+                                    <div style="font-size:11px;color:var(--accent);font-weight:700;margin-top:4px;">✓ Equipped</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (selectedBadge != null)
+                {
+                    <div class="badge-console" style="margin-top:25px;background:var(--panel-soft);border:2px solid var(--accent);border-radius:24px;padding:24px;box-shadow:0 12px 35px var(--shadow);">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div style="display:flex;align-items:center;gap:18px;">
+                                <div style="font-size:42px;width:70px;height:70px;background:var(--panel);border-radius:20px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);">@selectedBadge.Emoji</div>
+                                <div>
+                                    <h3 style="font-size:22px;font-weight:800;margin:0;color:var(--text);">@selectedBadge.Title</h3>
+                                    <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-top:2px;">@selectedBadge.Rarity Tier</div>
+                                </div>
+                            </div>
+                            <button type="button" @onclick="() => selectedBadge = null" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px 8px;">✖</button>
+                        </div>
+                        <p style="margin-top:16px;font-size:15px;color:var(--text);line-height:1.5;">@selectedBadge.Description</p>
+                        <div style="margin-top:12px;font-size:13px;font-weight:700;color:var(--accent);">
+                            @(selectedBadge.IsUnlocked ? $"🎉 Unlocked on {selectedBadge.UnlockedDate?.ToString("MMM d, yyyy") ?? "recently"}" : "🔒 Locked achievement")
+                        </div>
+
+                        <div style="margin-top:20px;display:flex;gap:12px;align-items:center;">
+                            @if (selectedBadge.IsUnlocked)
+                            {
+                                <button type="button" @onclick="() => ToggleEquip(selectedBadge)"
+                                        style="background:var(--accent);color:white;border:none;border-radius:14px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">
+                                    @(selectedBadge.IsEquipped ? "Unequip Badge" : "Equip Badge to Profile")
+                                </button>
+                            }
+                            else
+                            {
+                                <div style="color:#ef4444;font-size:14px;font-weight:600;">
+                                    🔒 Complete the requirement to unlock this badge!
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="privacy" style="display:@(activeTab == "privacy" ? "block" : "none");">
+            <div class="account-header">
+                <div>
+                    <p class="eyebrow">Controls</p>
+                    <h1>Privacy Settings</h1>
+                </div>
+            </div>
+
+            <div class="privacy-label">
+                <label>
+                    <input type="checkbox" @bind="currentUser.IsPublicProfile" />
+                    <span>Profile is Public (Everyone can see your profile & articles)</span>
+                </label>
+                <label>
+                    <input type="checkbox" @bind="currentUser.IsSchoolOnly" />
+                    <span>School Only (Only students in your school can view blogs)</span>
+                </label>
+                <label>
+                    <input type="checkbox" @bind="currentUser.HideEmail" />
+                    <span>Hide Email from profile</span>
+                </label>
+                <label>
+                    <input type="checkbox" @bind="currentUser.HideLocation" />
+                    <span>Hide Location from profile</span>
+                </label>
+            </div>
+
+            <button type="button" @onclick="SaveProfile"
+                    style="background:var(--accent);color:white;border:none;border-radius:14px;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;">
+                Save Privacy Settings
+            </button>
+        </section>
+
+        <section class="premium" style="display:@(activeTab == "premium" ? "block" : "none");">
+            <div class="account-header">
+                <div>
+                    <p class="eyebrow">Upgrade</p>
+                    <h1>Premium Features</h1>
+                </div>
+            </div>
+
+            <div style="background:var(--panel-soft);padding:30px;border-radius:20px;border:1px solid var(--line);margin-top:20px;">
+                <h2 style="color:var(--accent);font-size:24px;">⭐ Sways Premium - Coming Soon!</h2>
+                <ul style="margin-top:20px;line-height:1.8;font-size:16px;">
+                    <li>🎨 More profile themes & color schemes</li>
+                    <li>✨ Animated profile avatars & banners</li>
+                    <li>👑 Premium badges & special achievements</li>
+                    <li>📊 Detailed profile viewer analytics</li>
+                    <li>🌟 Featured profile placement</li>
+                    <li>✍️ Advanced article typography & layout tools</li>
+                    <li>🔖 Unlimited bookmarks & favorites</li>
+                    <li>🚫 100% Ad-Free Experience</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+}
+
+@code {
+    private UserAccount? currentUser;
+    private string activeTab = "profile";
+
+    private List<string> availableCities = new();
+    private Dictionary<string, List<string>> cityDatabase = new()
+    {
+        { "Georgia", new List<string> { "Tbilisi", "Kutaisi", "Batumi", "Rustavi", "Zugdidi", "Gori", "Poti", "Khashuri", "Telavi", "Akhaltsikhe", "Samtredia", "Senaki" } },
+        { "England", new List<string> { "London", "Manchester", "Birmingham", "Liverpool", "Leeds", "Bristol", "Oxford", "Cambridge", "Newcastle" } },
+        { "USA", new List<string> { "New York", "Los Angeles", "Chicago", "Houston", "Miami", "San Francisco", "Seattle", "Boston" } },
+        { "Germany", new List<string> { "Berlin", "Munich", "Hamburg", "Frankfurt", "Cologne", "Stuttgart" } },
+        { "Other", new List<string> { "Capital City", "District 1", "District 2" } }
+    };
+
+    private string newPassword = "";
+    private string pwdMsg = "";
+
+    private string themeMode = "open";
+    private string accentColor = "pink";
+    private string selectedLanguage = "english";
+
+    private int postCount = 0;
+    private int totalLikesCount = 0;
+    private int totalCommentsCount = 0;
+    private int followersCount = 0;
+    private int unlockedBadgesCount = 0;
+
+    private List<AchievementBadge> achievements = new();
+    private int progressPercentage = 0;
+    private AchievementBadge? selectedBadge = null;
+
+    private string saveMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnStateChanged += OnSessionChanged;
+        await LoadCurrentUserData();
+    }
+
+    private void OnSessionChanged()
+    {
+        InvokeAsync(LoadCurrentUserData);
+    }
+
+    private async Task LoadCurrentUserData()
+    {
+        currentUser = UserSession.CurrentUser;
+        if (currentUser != null)
+        {
+            currentUser = await ProfileService.GetUserProfileAsync(currentUser.Id);
+            if (!string.IsNullOrEmpty(currentUser.ThemeMode)) themeMode = currentUser.ThemeMode;
+            if (!string.IsNullOrEmpty(currentUser.AccentColor)) accentColor = currentUser.AccentColor;
+            PopulateCities();
+            await LoadAnalyticsAndAchievements();
+        }
+        StateHasChanged();
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == "activity")
+        {
+            InvokeAsync(RenderActivityCharts);
+        }
+    }
+
+    private void OnCountryChanged(ChangeEventArgs e)
+    {
+        if (currentUser == null) return;
+        currentUser.Country = e.Value?.ToString() ?? "Georgia";
+        PopulateCities();
+    }
+
+    private void PopulateCities()
+    {
+        if (currentUser != null && cityDatabase.ContainsKey(currentUser.Country))
+        {
+            availableCities = cityDatabase[currentUser.Country];
+        }
+        else
+        {
+            availableCities = cityDatabase["Georgia"];
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (currentUser == null) return;
+        currentUser.Name = $"{currentUser.FirstName} {currentUser.LastName}".Trim();
+        await ProfileService.UpdateUserProfileAsync(currentUser);
+        UserSession.Login(currentUser);
+        saveMessage = "✅ Profile settings saved successfully!";
+        StateHasChanged();
+        await Task.Delay(3000);
+        saveMessage = "";
+        StateHasChanged();
+    }
+
+    private async Task OnAvatarUploaded(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        if (currentUser == null) return;
+        var path = await FileUploadService.UploadFileAsync(e.File, "uploads");
+        if (!string.IsNullOrEmpty(path))
+        {
+            currentUser.ProfilePicUrl = path;
+            await SaveProfile();
+        }
+    }
+
+    private async Task OnBannerUploaded(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        if (currentUser == null) return;
+        var path = await FileUploadService.UploadFileAsync(e.File, "uploads");
+        if (!string.IsNullOrEmpty(path))
+        {
+            currentUser.BannerUrl = path;
+            await SaveProfile();
+        }
+    }
+
+    private async Task SavePassword()
+    {
+        if (currentUser == null || string.IsNullOrWhiteSpace(newPassword)) return;
+        await ProfileService.ChangePasswordAsync(currentUser.Id, newPassword);
+        pwdMsg = "✅ Password updated!";
+        newPassword = "";
+        StateHasChanged();
+        await Task.Delay(3000);
+        pwdMsg = "";
+        StateHasChanged();
+    }
+
+    private async Task DeleteAccount()
+    {
+        if (currentUser == null) return;
+        await ProfileService.DeleteUserAccountAsync(currentUser.Id);
+        await Logout();
+    }
+
+    private async Task Logout()
+    {
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", "sways-userId"); } catch {}
+        UserSession.Logout();
+        NavManager.NavigateTo("/auth");
+    }
+
+    private async Task SetTheme(string mode, string accent)
+    {
+        themeMode = mode;
+        accentColor = accent;
+        UserSession.SetTheme(mode, accent);
+        if (currentUser != null)
+        {
+            currentUser.ThemeMode = mode;
+            currentUser.AccentColor = accent;
+            await ProfileService.SaveUserThemeAsync(currentUser.Id, mode, accent);
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadAnalyticsAndAchievements()
+    {
+        if (currentUser == null) return;
+        var (fc, fw, pc) = await ProfileService.GetUserStatsAsync(currentUser.Id);
+        followersCount = fc;
+        postCount = pc;
+
+        achievements = await ProfileService.GetAchievementsAsync(currentUser.Id);
+        unlockedBadgesCount = achievements.Count(a => a.IsUnlocked);
+        progressPercentage = (int)Math.Round((double)unlockedBadgesCount / achievements.Count * 100);
+
+        var blogs = await ProfileService.GetUserBlogPostsAsync(currentUser.Id);
+        totalLikesCount = blogs.Sum(b => b.Likes.Count);
+        totalCommentsCount = blogs.Sum(b => b.Comments.Count);
+    }
+
+    private async Task RenderActivityCharts()
+    {
+        await Task.Delay(100);
+        if (currentUser == null) return;
+        
+        var blogs = await ProfileService.GetUserBlogPostsAsync(currentUser.Id);
+        
+        var last7Days = Enumerable.Range(0, 7)
+            .Select(i => DateTime.UtcNow.Date.AddDays(-6 + i))
+            .ToList();
+            
+        var dates = last7Days.Select(d => d.ToString("MMM d")).ToArray();
+        
+        var postsData = last7Days.Select(d => blogs.Count(b => b.DatePosted.Date == d.Date)).ToArray();
+        
+        var likesData = last7Days.Select(d => blogs.SelectMany(b => b.Likes).Count(l => l.LikedAt.Date == d.Date)).ToArray();
+        
+        await JS.InvokeVoidAsync("swaysHelpers.renderChart", "viewsChart", dates, postsData, likesData);
+    }
+
+    private void SelectBadge(AchievementBadge badge) => selectedBadge = badge;
+
+    private async Task ToggleEquip(AchievementBadge badge)
+    {
+        if (currentUser == null) return;
+        await ProfileService.ToggleEquipBadgeAsync(currentUser.Id, badge.Id);
+        achievements = await ProfileService.GetAchievementsAsync(currentUser.Id);
+        selectedBadge = achievements.FirstOrDefault(a => a.Id == badge.Id);
+        StateHasChanged();
+    }
+}

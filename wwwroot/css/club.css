@@ -1,0 +1,543 @@
+/* PREMIUM MODERN CLUBS PAGE DESIGN */
+
+body {
+  background-color: var(--bg, #f4f6fb);
+  color: var(--text, #0f172a);
+}
+
+.club-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: calc(100vh - 70px);
+  max-width: 1500px;
+  margin: 0 auto;
+  gap: 0;
+}
+
+/* LEFT SIDEBAR: COMMUNITIES */
+.club-sidebar {
+  background: var(--panel, #ffffff);
+  border-right: 1px solid var(--line, #e2e8f0);
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 70px;
+  height: calc(100vh - 70px);
+  overflow-y: auto;
+}
+
+.club-sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.club-sidebar-title h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.create-club-btn {
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 14px;
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 20px var(--accent-soft, rgba(65, 105, 225, 0.25));
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.create-club-btn:hover {
+  background: var(--accent-dark, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px var(--accent-soft, rgba(65, 105, 225, 0.35));
+}
+
+.sidebar-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted, #64748b);
+  margin-top: 10px;
+}
+
+.club-server-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--panel-soft, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.club-server-card:hover {
+  border-color: var(--accent, #4169e1);
+  transform: translateX(3px);
+  background: var(--panel, #ffffff);
+}
+
+.club-server-card.active {
+  background: var(--accent-soft, rgba(65, 105, 225, 0.12));
+  border-color: var(--accent, #4169e1);
+}
+
+.club-server-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.club-server-meta strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
+
+.club-server-meta span {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
+.join-club-box {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid var(--line, #e2e8f0);
+}
+
+.join-club-box input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #e2e8f0);
+  background: var(--input, #ffffff);
+  color: var(--text, #0f172a);
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.join-club-box button {
+  width: 100%;
+  padding: 11px;
+  border-radius: 12px;
+  background: var(--panel-soft, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  color: var(--text, #0f172a);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.join-club-box button:hover {
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+  border-color: var(--accent, #4169e1);
+}
+
+/* MAIN FEED AREA */
+.club-main {
+  padding: 24px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* CLUB HERO HERO BANNER */
+.club-hero-card {
+  position: relative;
+  min-height: 220px;
+  border-radius: 24px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(135deg, var(--accent, #4169e1) 0%, var(--accent-dark, #2563eb) 100%);
+  color: #ffffff;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 10px 30px var(--shadow, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+}
+
+.club-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.2) 100%);
+  z-index: 1;
+}
+
+.club-hero-info {
+  position: relative;
+  z-index: 2;
+}
+
+.club-hero-info h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.club-hero-info p {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 12px 0;
+  max-width: 700px;
+  line-height: 1.5;
+}
+
+.club-address-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  padding: 5px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.club-meta-tags {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* CONTENT GRID: CHAT ON LEFT, CHANNELS & MEMBERS ON RIGHT */
+.club-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* CHAT CONTAINER */
+.club-chat-card {
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 4px 20px var(--shadow, rgba(0, 0, 0, 0.04));
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+
+.chat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.chat-card-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text, #0f172a);
+}
+
+.chat-messages-scroll {
+  flex: 1;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.chat-message-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.chat-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.chat-message-content {
+  background: var(--panel-soft, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  padding: 12px 18px;
+  border-radius: 18px;
+  max-width: 85%;
+}
+
+.chat-author-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.chat-author-line strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
+
+.chat-author-line time {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+}
+
+.chat-message-content p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text, #0f172a);
+  white-space: pre-wrap;
+}
+
+/* CHAT BAR INPUT */
+.chat-input-bar {
+  background: var(--panel-soft, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 18px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-input-bar input {
+  flex: 1;
+  background: var(--input, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text, #0f172a);
+  outline: none;
+}
+
+.chat-action-icon {
+  font-size: 26px;
+  color: var(--accent, #4169e1);
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.chat-action-icon:hover {
+  color: var(--accent-dark, #2563eb);
+}
+
+.send-msg-btn {
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.send-msg-btn:hover {
+  background: var(--accent-dark, #2563eb);
+}
+
+/* RIGHT COLUMN: STACKED CHANNELS & MEMBERS */
+.club-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 70px;
+}
+
+.right-card {
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 4px 20px var(--shadow, rgba(0, 0, 0, 0.04));
+}
+
+.right-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.right-card-header h4 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text, #0f172a);
+}
+
+.channel-pill-item {
+  padding: 11px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.channel-pill-item:hover {
+  background: var(--panel-soft, #f8fafc);
+  color: var(--text, #0f172a);
+}
+
+.channel-pill-item.active {
+  background: var(--accent, #4169e1);
+  color: #ffffff;
+}
+
+.member-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+
+.member-list-item:hover {
+  background: var(--panel-soft, #f8fafc);
+}
+
+.member-name-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
+
+.member-role-tag {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--accent-soft, rgba(65, 105, 225, 0.15));
+  color: var(--accent, #4169e1);
+  text-transform: uppercase;
+}
+
+/* RESPONSIVE MEDIA QUERIES FOR CLUBS PAGE */
+@media (max-width: 1024px) {
+  .club-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .club-sidebar {
+    position: static;
+    height: auto;
+    max-height: 280px;
+    border-right: none;
+    border-bottom: 1px solid var(--line, #e2e8f0);
+    padding: 16px;
+  }
+
+  .club-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .club-right-column {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .club-main {
+    padding: 16px 12px 84px 12px;
+    gap: 16px;
+  }
+
+  .club-hero-card {
+    padding: 20px;
+    min-height: 180px;
+  }
+
+  .club-hero-info h1 {
+    font-size: clamp(20px, 5vw, 28px);
+  }
+
+  .chat-message-content {
+    max-width: 95%;
+  }
+
+  .chat-input-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chat-input-bar input {
+    width: 100%;
+  }
+}

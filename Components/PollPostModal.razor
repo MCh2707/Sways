@@ -1,0 +1,121 @@
+@using Sways.Models
+@using Sways.Services
+@inject ProfileService ProfileService
+
+@if (Show)
+{
+    <div class="modal-overlay">
+        <div class="modal-content blog-modal">
+            <h2>Create a Poll</h2>
+
+            <div class="form-group">
+                <label>Poll Question / Title</label>
+                <input @bind="pollTitle" class="form-control" placeholder="Ask a question..." />
+            </div>
+
+            <div class="form-group">
+                <label>Poll Type</label>
+                <div style="display:flex;gap:20px;margin-top:5px;">
+                    <label style="cursor:pointer;">
+                        <input type="radio" name="pollType" value="single" checked="@isSingleChoice"
+                               @onchange="@(() => isSingleChoice = true)" />
+                        Single choice (vote once, can't change)
+                    </label>
+                    <label style="cursor:pointer;">
+                        <input type="radio" name="pollType" value="multi" checked="@(!isSingleChoice)"
+                               @onchange="@(() => isSingleChoice = false)" />
+                        Multi choice
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Options</label>
+                @for (int i = 0; i < options.Count; i++)
+                {
+                    var index = i;
+                    <div style="display:flex;gap:10px;margin-bottom:10px;align-items:center;">
+                        <input class="form-control"
+                               value="@options[index]"
+                               @oninput="@(e => options[index] = e.Value?.ToString() ?? "")"
+                               placeholder="@($"Option {index + 1}")" />
+                        @if (options.Count > 2)
+                        {
+                            <button type="button" @onclick="() => RemoveOption(index)"
+                                    style="background:red;color:white;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;">✕</button>
+                        }
+                    </div>
+                }
+                <button type="button" @onclick="AddOption"
+                        style="background:royalblue;color:white;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;margin-top:5px;">
+                    + Add Option
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <p style="color:red">@errorMsg</p>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button class="btn btn-primary" @onclick="Submit">Post Poll</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private string pollTitle = "";
+    private bool isSingleChoice = true;
+    private List<string> options = new() { "", "" };
+    private string errorMsg = "";
+
+    protected override void OnParametersSet()
+    {
+        if (Show)
+        {
+            pollTitle = "";
+            isSingleChoice = true;
+            options = new List<string> { "", "" };
+            errorMsg = "";
+        }
+    }
+
+    private void AddOption() => options.Add("");
+    private void RemoveOption(int idx) => options.RemoveAt(idx);
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(pollTitle))
+        {
+            errorMsg = "Please enter a poll question.";
+            return;
+        }
+        var validOptions = options.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
+        if (validOptions.Count < 2)
+        {
+            errorMsg = "Please add at least 2 options.";
+            return;
+        }
+
+        var poll = new PollPost
+        {
+            UserId = UserId,
+            Title = pollTitle.Trim(),
+            IsSingleChoice = isSingleChoice,
+            DatePosted = DateTime.UtcNow
+        };
+
+        await ProfileService.AddPollPostAsync(poll, validOptions);
+        await ShowChanged.InvokeAsync(false);
+        await OnSaved.InvokeAsync();
+    }
+
+    private async Task Cancel() => await ShowChanged.InvokeAsync(false);
+}

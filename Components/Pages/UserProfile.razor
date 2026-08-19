@@ -1,0 +1,226 @@
+@page "/user/{UserId:int}"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject AuthService AuthService
+@inject ProfileService ProfileService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+
+<PageTitle>@(user?.Username ?? "User Profile") – Sways</PageTitle>
+
+<NavMenu />
+
+@if (loading)
+{
+    <p style="text-align:center;padding:60px;font-size:18px;color:var(--muted);">Loading profile...</p>
+}
+else if (user == null)
+{
+    <div style="text-align:center;padding:60px;">
+        <h2 style="color:var(--accent);">User not found.</h2>
+        <a href="/" style="display:inline-block;margin-top:15px;color:var(--accent);font-weight:700;">Back to Home</a>
+    </div>
+}
+else
+{
+    <header>
+        <div class="profile-banner" style="background-image:url('@user.BannerUrl');background-color:var(--accent);background-size:cover;background-position:center;"></div>
+        <div class="profile-container">
+            <div class="profile-pic" style="background-image:url('@user.ProfilePicUrl');background-size:cover;background-position:center;">
+                <div class="profile-status"></div>
+            </div>
+            <div class="profile-gap">
+                <div>
+                    <h1 style="display:flex;align-items:center;gap:8px;">
+                        @user.Username
+                        <span style="font-size:20px;">@equippedBadgeEmojis</span>
+                    </h1>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:var(--muted);">
+                        @if (!string.IsNullOrEmpty(user.EducationLevel))
+                        {
+                            <span style="background:var(--accent-soft);color:var(--accent);padding:3px 10px;border-radius:12px;font-weight:600;">
+                                🎓 @(user.EducationLevel == "school" ? (string.IsNullOrEmpty(user.SchoolName) ? "School" : user.SchoolName) :
+                                     user.EducationLevel == "university" ? (string.IsNullOrEmpty(user.UniversityName) ? "University" : user.UniversityName) : user.EducationLevel)
+                            </span>
+                        }
+                        @if (!string.IsNullOrEmpty(user.WorkplaceCompany))
+                        {
+                            <span style="background:rgba(34,197,94,0.15);color:#16a34a;padding:3px 10px;border-radius:12px;font-weight:600;">
+                                💼 @user.WorkplaceCompany @(!string.IsNullOrEmpty(user.WorkplacePosition) ? $"({user.WorkplacePosition})" : "")
+                            </span>
+                        }
+                        @if (!user.HideLocation && !string.IsNullOrEmpty(user.City))
+                        {
+                            <span style="background:rgba(234,179,8,0.15);color:#ca8a04;padding:3px 10px;border-radius:12px;font-weight:600;">
+                                📍 @user.City, @user.Country
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <div class="profile-follower-container">
+                    <ol>
+                        <li class="profile-follower-count">@followingCount</li>
+                        <li class="profile-follower-count">@followersCount</li>
+                    </ol>
+                    <ul>
+                        <li>Following</li>
+                        <li>Followers</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="profile-grid">
+        <section class="profile-info">
+            <h1>@user.Name</h1>
+            <div class="profile-pic-container">
+                <div class="profile-pic-info" style="background-image:url('@user.ProfilePicUrl');background-size:cover;"></div>
+                <h1 class="profile-username">@@@user.Username</h1>
+            </div>
+            <h1 id="profile-gender">@user.Gender</h1>
+
+            @if (UserSession.IsLoggedIn && UserSession.CurrentUser?.Id != user.Id)
+            {
+                <div class="btnContainer" style="margin-top:20px;">
+                    <button class="edit" @onclick="ToggleFollow" style="flex:1;">
+                        @(isFollowing ? "Unfollow" : "Follow")
+                    </button>
+                    <button class="edit" @onclick="StartMessage" style="flex:1;background:var(--accent-dark);">
+                        💬 Message
+                    </button>
+                </div>
+            }
+        </section>
+
+        <section class="about">
+            <h1 style="font-size:24px;margin-bottom:10px;">About</h1>
+            <p style="white-space:pre-wrap;line-height:1.6;color:var(--text);">
+                @(string.IsNullOrEmpty(user.Bio) ? user.AboutMe : user.Bio)
+            </p>
+        </section>
+
+        <section class="socials">
+            <h1 style="font-size:22px;margin-bottom:10px;">Social Links</h1>
+            <ul>
+                @if (!user.HideEmail && !string.IsNullOrEmpty(user.Email))
+                {
+                    <li>📧 <a href="mailto:@user.Email">@user.Email</a></li>
+                }
+                @if (!string.IsNullOrEmpty(user.TwitterLink) && user.TwitterLink != "#")
+                {
+                    <li>🐦 <a href="@user.TwitterLink" target="_blank">Twitter</a></li>
+                }
+                @if (!string.IsNullOrEmpty(user.InstagramLink) && user.InstagramLink != "#")
+                {
+                    <li>📸 <a href="@user.InstagramLink" target="_blank">Instagram</a></li>
+                }
+                @if (!string.IsNullOrEmpty(user.FacebookLink) && user.FacebookLink != "#")
+                {
+                    <li>📘 <a href="@user.FacebookLink" target="_blank">Facebook</a></li>
+                }
+                @if (!string.IsNullOrEmpty(user.DiscordLink) && user.DiscordLink != "#")
+                {
+                    <li>💬 Discord: @user.DiscordLink</li>
+                }
+            </ul>
+        </section>
+    </main>
+
+    <div style="max-width:900px;margin:40px auto 0;">
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:20px;color:var(--text);">Posts by @user.Username</h2>
+        @if (userBlogs.Count == 0)
+        {
+            <div style="padding:40px;background:var(--panel);border:1px solid var(--line);border-radius:20px;text-align:center;color:var(--muted);">
+                No blog posts uploaded yet.
+            </div>
+        }
+        else
+        {
+            @foreach (var post in userBlogs)
+            {
+                <section class="post" style="margin-bottom:25px;">
+                    <div class="post-user-container">
+                        <div class="post-profile">
+                            <div class="post-profile-pic" style="background-image:url('@user.ProfilePicUrl');background-size:cover;"></div>
+                            <h1>@user.Username</h1>
+                        </div>
+                        <p style="font-size:14px;color:var(--muted);">@post.DatePosted.ToString("MMM d, yyyy")</p>
+                    </div>
+
+                    <section class="post-section">
+                        <div class="post-container">
+                            <div class="post-h2">
+                                <h2 style="font-size:20px;margin-bottom:8px;">@post.Title</h2>
+                            </div>
+                            <div class="post-blog">
+                                <p style="white-space:pre-wrap;">@post.Content</p>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(post.MediaInfo))
+                        {
+                            <section class="post-media">
+                                <p>@post.MediaInfo</p>
+                            </section>
+                        }
+                    </section>
+                </section>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int UserId { get; set; }
+
+    private UserAccount? user;
+    private bool loading = true;
+    private bool isFollowing = false;
+    private int followersCount = 0;
+    private int followingCount = 0;
+    private string equippedBadgeEmojis = "";
+    private List<BlogPost> userBlogs = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (UserSession.IsLoggedIn && UserSession.CurrentUser?.Id == UserId)
+        {
+            NavManager.NavigateTo("/profile");
+            return;
+        }
+
+        loading = true;
+        user = await AuthService.GetUserByIdAsync(UserId);
+
+        if (user != null)
+        {
+            followersCount = await ProfileService.GetFollowersCountAsync(UserId);
+            followingCount = await ProfileService.GetFollowingCountAsync(UserId);
+            equippedBadgeEmojis = ProfileService.GetBadgeEmojis(user.EquippedBadges);
+            userBlogs = await ProfileService.GetUserBlogPostsAsync(UserId);
+
+            if (UserSession.IsLoggedIn)
+            {
+                isFollowing = await ProfileService.IsFollowingAsync(UserSession.CurrentUser!.Id, UserId);
+            }
+        }
+
+        loading = false;
+    }
+
+    private async Task ToggleFollow()
+    {
+        if (!UserSession.IsLoggedIn || user == null) return;
+        await ProfileService.ToggleFollowAsync(UserSession.CurrentUser!.Id, user.Id);
+        isFollowing = await ProfileService.IsFollowingAsync(UserSession.CurrentUser!.Id, user.Id);
+        followersCount = await ProfileService.GetFollowersCountAsync(user.Id);
+    }
+
+    private void StartMessage()
+    {
+        NavManager.NavigateTo("/#chat");
+    }
+}

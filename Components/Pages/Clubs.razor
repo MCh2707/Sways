@@ -1,0 +1,697 @@
+@page "/clubs"
+@rendermode InteractiveServer
+@using Sways.Models
+@using Sways.Services
+@inject ClubService ClubService
+@inject ProfileService ProfileService
+@inject FileUploadService FileUploadService
+@inject UserSession UserSession
+@inject NavigationManager NavManager
+@inject IJSRuntime JS
+
+<PageTitle>Clubs & Communities – Sways</PageTitle>
+
+<NavMenu />
+
+<div class="club-layout">
+    <aside class="club-sidebar">
+        <div class="club-sidebar-title">
+            <h2>Communities</h2>
+        </div>
+
+        @if (UserSession.IsLoggedIn)
+        {
+            <button class="create-club-btn" @onclick="OpenCreateClubModal">
+                + Create Community
+            </button>
+        }
+
+        <div class="sidebar-label">
+            Your Communities
+        </div>
+
+        @if (userClubs.Count == 0)
+        {
+            <div style="font-size:13px;color:var(--muted);padding:10px;text-align:center;">
+                No communities joined yet.
+            </div>
+        }
+        else
+        {
+            @foreach (var club in userClubs)
+            {
+                <div class="club-server-card @(activeClub?.Id == club.Id ? "active" : "")" @onclick="() => SelectClub(club.Id)">
+                    <div class="club-server-icon" style="@(!string.IsNullOrEmpty(club.IconUrl) ? $"background-image:url('{club.IconUrl}');" : "")">
+                        @if (string.IsNullOrEmpty(club.IconUrl))
+                        {
+                            <span>🤖</span>
+                        }
+                    </div>
+                    <div class="club-server-meta">
+                        <strong>@club.Name</strong>
+                        <span>@club.Members.Count members</span>
+                    </div>
+                </div>
+            }
+        }
+
+        <div class="join-club-box">
+            <div class="sidebar-label" style="margin-bottom:8px;">Join Community</div>
+            <input type="text" @bind="inviteCodeInput" placeholder="Paste Link or Code (#code)..." />
+            <button @onclick="JoinClub">Add Community</button>
+            @if (!string.IsNullOrEmpty(joinMessage))
+            {
+                <p style="@(joinSuccess ? "color:green;" : "color:red;") font-size:12px;margin-top:6px;text-align:center;font-weight:600;">@joinMessage</p>
+            }
+        </div>
+    </aside>
+
+    <main class="club-main">
+        @if (activeClub == null)
+        {
+            <div style="text-align:center;padding:80px 20px;background:var(--panel);border-radius:24px;border:1px solid var(--line);">
+                <h2 style="font-size:28px;color:var(--accent);font-weight:800;">Welcome to Sways Communities!</h2>
+                <p style="margin-top:10px;color:var(--muted);">Select a community from the left sidebar or create your own to start chatting live.</p>
+            </div>
+        }
+        else
+        {
+            <section class="club-hero-card" style="@(!string.IsNullOrEmpty(activeClub.BannerUrl) ? $"background-image:url('{activeClub.BannerUrl}');" : "")">
+                <div class="club-hero-backdrop"></div>
+                <div class="club-hero-info">
+                    <h1>🤖 @activeClub.Name</h1>
+                    <p>@activeClub.Description</p>
+                    <span class="club-address-badge">Club Address: #@activeClub.InviteCode</span>
+
+                    <div class="club-meta-tags">
+                        <div class="meta-pill">
+                            <i class='bx bx-user'></i> @activeClub.Members.Count members
+                        </div>
+                        <div class="meta-pill">
+                            <i class='bx bx-message-dots'></i> 37 online
+                        </div>
+                        <div class="meta-pill">
+                            <i class='bx bx-network-chart'></i> @activeClub.Category
+                        </div>
+                        @if (IsCurrentAdmin)
+                        {
+                            <div class="meta-pill" style="background:var(--accent);cursor:pointer;font-weight:800;" @onclick="OpenAdminConsole">
+                                💻 Admin Console
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <div class="club-content-grid">
+                <div class="club-chat-card">
+                    <div class="chat-card-header">
+                        <div>
+                            <h3># @(activeChannel?.Name ?? "general")</h3>
+                            <span style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;">
+                                Permission: @(activeChannel?.WritePermission ?? "everyone")
+                            </span>
+                        </div>
+                        <span style="color:var(--muted);font-size:13px;">@(activeChannel?.Description ?? "General Conversation")</span>
+                    </div>
+
+                    <div class="chat-messages-scroll" id="club-chat-messages">
+                        @if (channelMessages.Count == 0)
+                        {
+                            <div style="text-align:center;padding:40px;color:var(--muted);font-size:14px;">
+                                Welcome to #@(activeChannel?.Name ?? "general")! Be the first to post a message.
+                            </div>
+                        }
+                        @foreach (var msg in channelMessages)
+                        {
+                            <div class="chat-message-row">
+                                <div class="chat-avatar" style="@(!string.IsNullOrEmpty(msg.User?.ProfilePicUrl) ? $"background-image:url('{msg.User?.ProfilePicUrl}');" : "")">
+                                    @if (string.IsNullOrEmpty(msg.User?.ProfilePicUrl))
+                                    {
+                                        <span>@msg.User?.Username.FirstOrDefault().ToString().ToUpper()</span>
+                                    }
+                                </div>
+                                <div class="chat-message-content">
+                                    <div class="chat-author-line">
+                                        <strong>@msg.User?.Username</strong>
+                                        <time>@msg.CreatedAt.ToString("HH:mm")</time>
+                                    </div>
+                                    <p>@msg.Content</p>
+                                    @if (!string.IsNullOrEmpty(msg.ImageUrl))
+                                    {
+                                        <img src="@msg.ImageUrl" style="max-width:100%;max-height:250px;border-radius:12px;margin-top:8px;" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(msg.LinkUrl))
+                                    {
+                                        <a href="@msg.LinkUrl" target="_blank" style="color:var(--accent);display:block;margin-top:6px;font-size:13px;">🔗 @msg.LinkUrl</a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (showEmojiPicker)
+                    {
+                        <div style="background:var(--panel-soft);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                            @foreach (var emoji in new[] { "😀", "😂", "🔥", "❤️", "👍", "🤖", "🚀", "🎉", "😭", "💯", "✨", "👑" })
+                            {
+                                <span style="font-size:22px;cursor:pointer;padding:4px;" @onclick="() => InsertEmoji(emoji)">@emoji</span>
+                            }
+                        </div>
+                    }
+
+                    @if (showLinkInput)
+                    {
+                        <div style="background:var(--panel-soft);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;display:flex;gap:8px;">
+                            <input type="text" @bind="attachmentLink" placeholder="Paste link URL here..." style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);" />
+                            <button @onclick="() => showLinkInput = false" style="background:var(--accent);color:white;border:none;border-radius:8px;padding:6px 12px;font-weight:700;">OK</button>
+                        </div>
+                    }
+
+                    <div class="chat-input-bar">
+                        <label class="chat-action-icon bx bx-image-add" title="Attach Photo">
+                            <InputFile OnChange="OnChatImageUploaded" accept="image/*" style="display:none;" />
+                        </label>
+
+                        <input type="text" @bind="newMessageContent" @onkeydown="HandleKeyDown" placeholder="Chat in #@(activeChannel?.Name)..." />
+
+                        <i class='chat-action-icon bx bx-happy-heart-eyes' title="Emojis" @onclick="() => showEmojiPicker = !showEmojiPicker"></i>
+                        <i class='chat-action-icon bx bx-link' title="Attach Link" @onclick="() => showLinkInput = !showLinkInput"></i>
+
+                        <button class="send-msg-btn" @onclick="SendMessage">Send</button>
+                    </div>
+                </div>
+
+                <div class="club-right-column">
+                    <div class="right-card">
+                        <div class="right-card-header">
+                            <h4>Channels</h4>
+                            @if (IsCurrentAdmin || IsCurrentMod)
+                            {
+                                <button style="color:var(--accent);font-weight:700;font-size:13px;border:none;background:none;cursor:pointer;" @onclick="OpenAdminConsole">+ Add / Edit</button>
+                            }
+                        </div>
+
+                        @foreach (var ch in channels)
+                        {
+                            <div class="channel-pill-item @(activeChannel?.Id == ch.Id ? "active" : "")" @onclick="() => SelectChannel(ch)">
+                                <span># @ch.Name</span>
+                                @if (ch.WritePermission == "admin")
+                                {
+                                    <span style="font-size:10px;opacity:0.7;">🔒 Admin</span>
+                                }
+                                else if (ch.WritePermission == "moderator")
+                                {
+                                    <span style="font-size:10px;opacity:0.7;">🛡️ Mod</span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="right-card">
+                        <div class="right-card-header">
+                            <h4>Members <small style="color:var(--muted)">(@members.Count)</small></h4>
+                        </div>
+
+                        @foreach (var m in members)
+                        {
+                            <div class="member-list-item">
+                                <div class="chat-avatar" style="width:34px;height:34px;font-size:13px;@(!string.IsNullOrEmpty(m.User?.ProfilePicUrl) ? $"background-image:url('{m.User?.ProfilePicUrl}');" : "")">
+                                    @if (string.IsNullOrEmpty(m.User?.ProfilePicUrl))
+                                    {
+                                        <span>@m.User?.Username.FirstOrDefault().ToString().ToUpper()</span>
+                                    }
+                                </div>
+                                <div style="flex:1;">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                                        <div class="member-name-title">@m.User?.Username</div>
+                                        @if (m.Role == "admin")
+                                        {
+                                            <span class="member-role-tag">ADMIN</span>
+                                        }
+                                        else if (m.Role == "moderator")
+                                        {
+                                            <span class="member-role-tag" style="background:rgba(16,185,129,0.15);color:#10b981;">MOD</span>
+                                        }
+                                    </div>
+                                    <span style="font-size:11px;color:#10b981;font-weight:600;">● Online</span>
+                                </div>
+                                @if (IsCurrentAdmin && m.UserId != currentUser?.Id)
+                                {
+                                    <div style="position:relative;">
+                                        <button @onclick="() => ToggleMemberMenu(m.UserId)" style="border:none;background:none;cursor:pointer;color:var(--muted);">⋮</button>
+                                        @if (selectedMemberMenuId == m.UserId)
+                                        {
+                                            <div style="position:absolute;right:0;top:20px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 4px 15px var(--shadow);z-index:20;width:130px;">
+                                                <button @onclick='() => SetMemberRole(m.UserId, m.Role == "moderator" ? "member" : "moderator")' style="width:100%;text-align:left;padding:6px;font-size:12px;border:none;background:none;cursor:pointer;color:var(--text);">
+                                                    @(m.Role == "moderator" ? "Remove Mod" : "Make Mod")
+                                                </button>
+                                                <button @onclick="() => KickMember(m.UserId)" style="width:100%;text-align:left;padding:6px;font-size:12px;border:none;background:none;cursor:pointer;color:#ef4444;">
+                                                    Kick Member
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </main>
+</div>
+
+@if (showAdminConsole && activeClub != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width:680px;background:#0f172a;color:#f8fafc;border:1px solid #334155;border-radius:20px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:12px;margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:20px;">💻</span>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;color:#60a5fa;font-family:monospace;">[ADMIN_CONSOLE] - @activeClub.Name</h2>
+                </div>
+                <button @onclick="() => showAdminConsole = false" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #1e293b;padding-bottom:10px;">
+                <button @onclick='() => adminTab = "server"' style="padding:8px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:@(adminTab == "server" ? "#3b82f6" : "#1e293b");color:white;">
+                    ⚙️ Server Info
+                </button>
+                <button @onclick='() => adminTab = "channels"' style="padding:8px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:@(adminTab == "channels" ? "#3b82f6" : "#1e293b");color:white;">
+                    # Channels Console
+                </button>
+                <button @onclick='() => adminTab = "members"' style="padding:8px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:@(adminTab == "members" ? "#3b82f6" : "#1e293b");color:white;">
+                    👥 Member Roles
+                </button>
+            </div>
+
+            @if (adminTab == "server")
+            {
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:6px;font-family:monospace;">SERVER NAME</label>
+                        <input type="text" @bind="consoleClubName" style="width:100%;padding:10px 14px;border-radius:10px;background:#1e293b;border:1px solid #334155;color:white;font-size:14px;outline:none;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:6px;font-family:monospace;">SERVER PURPOSE / ABOUT</label>
+                        <textarea @bind="consoleClubDesc" style="width:100%;height:90px;padding:10px 14px;border-radius:10px;background:#1e293b;border:1px solid #334155;color:white;font-size:14px;outline:none;"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:6px;font-family:monospace;">CATEGORY / TAG</label>
+                        <input type="text" @bind="consoleClubCategory" style="width:100%;padding:10px 14px;border-radius:10px;background:#1e293b;border:1px solid #334155;color:white;font-size:14px;outline:none;" />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(consoleSaveMsg))
+                    {
+                        <p style="color:#4ade80;font-size:13px;font-weight:700;margin:0;">@consoleSaveMsg</p>
+                    }
+
+                    <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                        <button @onclick="SaveServerConfigFromConsole" style="background:#2563eb;color:white;border:none;padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">
+                            Save Server Config
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (adminTab == "channels")
+            {
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="background:#1e293b;padding:14px;border-radius:14px;border:1px solid #334155;">
+                        <h4 style="margin:0 0 10px 0;font-size:14px;color:#60a5fa;">+ Add New Channel</h4>
+                        <div style="display:grid;grid-template-columns:1fr 140px auto;gap:10px;align-items:center;">
+                            <input type="text" @bind="consoleNewChannelName" placeholder="channel-name" style="padding:8px 12px;border-radius:8px;background:#0f172a;border:1px solid #334155;color:white;font-size:13px;" />
+                            <select @bind="consoleNewChannelPerm" style="padding:8px;border-radius:8px;background:#0f172a;border:1px solid #334155;color:white;font-size:13px;">
+                                <option value="everyone">Everyone</option>
+                                <option value="moderator">Mods Only</option>
+                                <option value="admin">Admins Only</option>
+                            </select>
+                            <button @onclick="AddChannelFromConsole" style="background:#10b981;color:white;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;">Create</button>
+                        </div>
+                    </div>
+
+                    <h4 style="margin:10px 0 0 0;font-size:14px;color:#94a3b8;">Existing Channels</h4>
+                    <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+                        @foreach (var ch in channels)
+                        {
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:#1e293b;padding:10px 14px;border-radius:10px;">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <span style="font-weight:700;color:white;"># @ch.Name</span>
+                                    <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.1);color:#cbd5e1;">Permission: @ch.WritePermission</span>
+                                </div>
+                                @if (ch.Name != "general")
+                                {
+                                    <button @onclick="() => DeleteChannelFromConsole(ch.Id)" style="background:#ef4444;color:white;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">Delete</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (adminTab == "members")
+            {
+                <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                    @foreach (var m in members)
+                    {
+                        <div style="display:flex;justify-content:space-between;align-items:center;background:#1e293b;padding:10px 14px;border-radius:10px;">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <strong style="color:white;font-size:14px;">@m.User?.Username</strong>
+                                <span style="font-size:11px;color:#38bdf8;">(@m.Role)</span>
+                            </div>
+                            @if (m.UserId != currentUser?.Id)
+                            {
+                                <div style="display:flex;gap:6px;">
+                                    <button @onclick='() => SetMemberRole(m.UserId, m.Role == "moderator" ? "member" : "moderator")' style="background:#3b82f6;color:white;border:none;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+                                        @(m.Role == "moderator" ? "Demote" : "Make Mod")
+                                    </button>
+                                    <button @onclick="() => KickMember(m.UserId)" style="background:#ef4444;color:white;border:none;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+                                        Kick
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (showCreateClubModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <h2>Create New Community / Club</h2>
+            @if (!canCreate)
+            {
+                <p style="color:#ef4444;font-weight:700;">⚠️ You have already created 1 club! Each user is allowed to create up to 1 club.</p>
+                <div class="modal-actions" style="margin-top:20px;">
+                    <button class="btn btn-secondary" @onclick="() => showCreateClubModal = false">Close</button>
+                </div>
+            }
+            else
+            {
+                <div class="form-group">
+                    <label>Club Name</label>
+                    <input type="text" class="form-control" @bind="newClubName" placeholder="e.g. Robotics Hub" />
+                </div>
+                <div class="form-group">
+                    <label>Category / Tag</label>
+                    <input type="text" class="form-control" @bind="newClubCategory" placeholder="e.g. Engineering, Art, Chess, Gaming" />
+                </div>
+                <div class="form-group">
+                    <label>Purpose / Description</label>
+                    <textarea class="form-control long-input" @bind="newClubDesc" placeholder="Describe the purpose of your community..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Club Icon</label>
+                    <InputFile OnChange="OnNewClubIconUploaded" accept="image/*" />
+                </div>
+                <div class="form-group">
+                    <label>Club Banner Image</label>
+                    <InputFile OnChange="OnNewClubBannerUploaded" accept="image/*" />
+                </div>
+                @if (!string.IsNullOrEmpty(createError))
+                {
+                    <p style="color:#ef4444;font-size:13px;">@createError</p>
+                }
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @onclick="() => showCreateClubModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SubmitCreateClub">Create Club</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private UserAccount? currentUser;
+    private List<Club> userClubs = new();
+    private Club? activeClub;
+    private List<ClubChannel> channels = new();
+    private ClubChannel? activeChannel;
+    private List<ClubMessage> channelMessages = new();
+    private List<ClubMember> members = new();
+
+    private string inviteCodeInput = "";
+    private string joinMessage = "";
+    private bool joinSuccess = false;
+
+    private bool showCreateClubModal;
+    private bool canCreate = true;
+    private string newClubName = "";
+    private string newClubCategory = "Engineering";
+    private string newClubDesc = "";
+    private string? newClubIconUrl;
+    private string? newClubBannerUrl;
+    private string createError = "";
+
+    private bool showAdminConsole;
+    private string adminTab = "server";
+    private string consoleClubName = "";
+    private string consoleClubDesc = "";
+    private string consoleClubCategory = "";
+    private string consoleNewChannelName = "";
+    private string consoleNewChannelPerm = "everyone";
+    private string consoleSaveMsg = "";
+
+    private string newMessageContent = "";
+    private string? attachmentImageUrl;
+    private string? attachmentLink;
+    private bool showEmojiPicker;
+    private bool showLinkInput;
+
+    private int selectedMemberMenuId = -1;
+
+    private bool IsCurrentAdmin => activeClub != null && currentUser != null && members.Any(m => m.UserId == currentUser.Id && m.Role == "admin");
+    private bool IsCurrentMod => activeClub != null && currentUser != null && members.Any(m => m.UserId == currentUser.Id && (m.Role == "admin" || m.Role == "moderator"));
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserSession.OnStateChanged += OnSessionChanged;
+        await LoadData();
+    }
+
+    private void OnSessionChanged()
+    {
+        InvokeAsync(LoadData);
+    }
+
+    private async Task LoadData()
+    {
+        currentUser = UserSession.CurrentUser;
+        if (currentUser != null)
+        {
+            userClubs = await ClubService.GetUserClubsAsync(currentUser.Id);
+            if (activeClub == null && userClubs.Count > 0)
+            {
+                await SelectClub(userClubs.First().Id);
+            }
+            else if (activeClub != null)
+            {
+                await SelectClub(activeClub.Id);
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task SelectClub(int clubId)
+    {
+        activeClub = await ClubService.GetClubByIdAsync(clubId);
+        if (activeClub != null)
+        {
+            channels = await ClubService.GetClubChannelsAsync(clubId);
+            members = await ClubService.GetClubMembersAsync(clubId);
+            if (activeChannel == null || !channels.Any(c => c.Id == activeChannel.Id))
+            {
+                activeChannel = channels.FirstOrDefault();
+            }
+            if (activeChannel != null)
+            {
+                await SelectChannel(activeChannel);
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task SelectChannel(ClubChannel channel)
+    {
+        activeChannel = channel;
+        if (activeChannel != null)
+        {
+            channelMessages = await ClubService.GetChannelMessagesAsync(activeChannel.Id);
+        }
+        StateHasChanged();
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("swaysHelpers.scrollToBottom", "club-chat-messages");
+    }
+
+    private async Task SendMessage()
+    {
+        if (currentUser == null || activeClub == null || activeChannel == null) return;
+        if (string.IsNullOrWhiteSpace(newMessageContent) && string.IsNullOrEmpty(attachmentImageUrl) && string.IsNullOrEmpty(attachmentLink)) return;
+
+        try
+        {
+            var msg = await ClubService.SendChannelMessageAsync(
+                activeClub.Id, activeChannel.Id, currentUser.Id, newMessageContent, attachmentImageUrl, attachmentLink);
+
+            newMessageContent = "";
+            attachmentImageUrl = null;
+            attachmentLink = null;
+            showEmojiPicker = false;
+            showLinkInput = false;
+
+            channelMessages.Add(msg);
+            StateHasChanged();
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("swaysHelpers.scrollToBottom", "club-chat-messages");
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private void InsertEmoji(string emoji)
+    {
+        newMessageContent += emoji;
+        showEmojiPicker = false;
+    }
+
+    private async Task OnChatImageUploaded(InputFileChangeEventArgs e)
+    {
+        var url = await FileUploadService.UploadFileAsync(e.File);
+        if (!string.IsNullOrEmpty(url))
+        {
+            attachmentImageUrl = url;
+        }
+    }
+
+    private async Task JoinClub()
+    {
+        if (currentUser == null) { NavManager.NavigateTo("/auth"); return; }
+        joinMessage = "";
+        var (success, msg, club) = await ClubService.JoinClubByInviteCodeAsync(inviteCodeInput, currentUser.Id);
+        joinSuccess = success;
+        joinMessage = msg;
+        if (success && club != null)
+        {
+            inviteCodeInput = "";
+            await LoadData();
+            await SelectClub(club.Id);
+        }
+    }
+
+    private async Task OpenCreateClubModal()
+    {
+        if (currentUser == null) { NavManager.NavigateTo("/auth"); return; }
+        canCreate = await ClubService.CanUserCreateClubAsync(currentUser.Id);
+        createError = "";
+        newClubName = "";
+        newClubDesc = "";
+        showCreateClubModal = true;
+    }
+
+    private async Task OnNewClubIconUploaded(InputFileChangeEventArgs e)
+    {
+        newClubIconUrl = await FileUploadService.UploadFileAsync(e.File);
+    }
+
+    private async Task OnNewClubBannerUploaded(InputFileChangeEventArgs e)
+    {
+        newClubBannerUrl = await FileUploadService.UploadFileAsync(e.File);
+    }
+
+    private async Task SubmitCreateClub()
+    {
+        if (currentUser == null) return;
+        if (string.IsNullOrWhiteSpace(newClubName))
+        {
+            createError = "Please enter a club name.";
+            return;
+        }
+
+        var club = await ClubService.CreateClubAsync(newClubName, newClubDesc, newClubCategory, newClubIconUrl, newClubBannerUrl, currentUser.Id);
+        showCreateClubModal = false;
+        await LoadData();
+        await SelectClub(club.Id);
+    }
+
+    private void OpenAdminConsole()
+    {
+        if (activeClub == null) return;
+        consoleClubName = activeClub.Name;
+        consoleClubDesc = activeClub.Description;
+        consoleClubCategory = activeClub.Category;
+        consoleSaveMsg = "";
+        adminTab = "server";
+        showAdminConsole = true;
+    }
+
+    private async Task SaveServerConfigFromConsole()
+    {
+        if (activeClub == null || currentUser == null || string.IsNullOrWhiteSpace(consoleClubName)) return;
+        await ClubService.UpdateClubDetailsAsync(activeClub.Id, consoleClubName, consoleClubDesc, consoleClubCategory, null, null, currentUser.Id);
+        consoleSaveMsg = "✅ Server configuration saved successfully!";
+        await SelectClub(activeClub.Id);
+        StateHasChanged();
+        await Task.Delay(2000);
+        consoleSaveMsg = "";
+        StateHasChanged();
+    }
+
+    private async Task AddChannelFromConsole()
+    {
+        if (activeClub == null || currentUser == null || string.IsNullOrWhiteSpace(consoleNewChannelName)) return;
+        var channel = await ClubService.CreateChannelAsync(activeClub.Id, consoleNewChannelName, consoleNewChannelPerm, currentUser.Id);
+        consoleNewChannelName = "";
+        channels = await ClubService.GetClubChannelsAsync(activeClub.Id);
+        await SelectChannel(channel);
+    }
+
+    private async Task DeleteChannelFromConsole(int channelId)
+    {
+        if (activeClub == null || currentUser == null) return;
+        await ClubService.DeleteChannelAsync(activeClub.Id, channelId, currentUser.Id);
+        channels = await ClubService.GetClubChannelsAsync(activeClub.Id);
+        if (activeChannel?.Id == channelId)
+        {
+            activeChannel = channels.FirstOrDefault();
+            if (activeChannel != null) await SelectChannel(activeChannel);
+        }
+        StateHasChanged();
+    }
+
+    private void ToggleMemberMenu(int userId)
+    {
+        selectedMemberMenuId = selectedMemberMenuId == userId ? -1 : userId;
+    }
+
+    private async Task SetMemberRole(int userId, string role)
+    {
+        if (activeClub == null || currentUser == null) return;
+        await ClubService.UpdateMemberRoleAsync(activeClub.Id, userId, role, currentUser.Id);
+        selectedMemberMenuId = -1;
+        members = await ClubService.GetClubMembersAsync(activeClub.Id);
+    }
+
+    private async Task KickMember(int userId)
+    {
+        if (activeClub == null || currentUser == null) return;
+        await ClubService.KickMemberAsync(activeClub.Id, userId, currentUser.Id);
+        selectedMemberMenuId = -1;
+        members = await ClubService.GetClubMembersAsync(activeClub.Id);
+    }
+
+    public void Dispose() => UserSession.OnStateChanged -= OnSessionChanged;
+}

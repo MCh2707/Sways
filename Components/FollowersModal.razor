@@ -1,0 +1,104 @@
+@using Sways.Models
+@using Sways.Services
+@inject ProfileService ProfileService
+
+@if (Show)
+{
+    <div class="modal-overlay">
+        <div class="modal-content blog-modal">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2>@(ShowFollowers ? "Followers" : "Following")</h2>
+                <div style="display:flex;gap:10px;">
+                    <button @onclick="@(() => ShowFollowers = true)"
+                            style="@(ShowFollowers ? "background:royalblue;color:white;" : "background:#eee;color:#333;") border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600;">
+                        Followers (@followers.Count)
+                    </button>
+                    <button @onclick="@(() => ShowFollowers = false)"
+                            style="@(!ShowFollowers ? "background:royalblue;color:white;" : "background:#eee;color:#333;") border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600;">
+                        Following (@following.Count)
+                    </button>
+                </div>
+            </div>
+
+            @{
+                var list = ShowFollowers ? followers : following;
+            }
+
+            @if (list.Count == 0)
+            {
+                <p style="color:#999;text-align:center;padding:30px;">
+                    @(ShowFollowers ? "No followers yet." : "Not following anyone yet.")
+                </p>
+            }
+            else
+            {
+                @foreach (var user in list)
+                {
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0f0;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:45px;height:45px;border-radius:50%;background-color:royalblue;background-image:url('@user.ProfilePicUrl');background-size:cover;"></div>
+                            <div>
+                                <div style="font-weight:700;">@user.Username</div>
+                                <div style="color:#999;font-size:13px;">@user.Name</div>
+                            </div>
+                        </div>
+                        @if (CurrentUserId != user.Id)
+                        {
+                            bool isFollowing = followingIds.Contains(user.Id);
+                            <button @onclick="() => ToggleFollow(user.Id)"
+                                    style="@(isFollowing ? "background:#eee;color:#333;" : "background:royalblue;color:white;") border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:600;transition:all 0.2s;">
+                                @(isFollowing ? "Unfollow" : "Follow")
+                            </button>
+                        }
+                    </div>
+                }
+            }
+
+            <div style="margin-top:20px;text-align:right;">
+                <button class="btn btn-secondary" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public int ProfileUserId { get; set; }
+    [Parameter] public int CurrentUserId { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool ShowFollowers = true;
+    private List<UserAccount> followers = new();
+    private List<UserAccount> following = new();
+    private HashSet<int> followingIds = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Show)
+        {
+            followers = await ProfileService.GetFollowersAsync(ProfileUserId);
+            following = await ProfileService.GetFollowingAsync(ProfileUserId);
+            var myFollowing = await ProfileService.GetFollowingAsync(CurrentUserId);
+            followingIds = myFollowing.Select(u => u.Id).ToHashSet();
+        }
+    }
+
+    private async Task ToggleFollow(int targetId)
+    {
+        await ProfileService.ToggleFollowAsync(CurrentUserId, targetId);
+        if (followingIds.Contains(targetId))
+            followingIds.Remove(targetId);
+        else
+            followingIds.Add(targetId);
+        followers = await ProfileService.GetFollowersAsync(ProfileUserId);
+        following = await ProfileService.GetFollowingAsync(ProfileUserId);
+    }
+
+    private async Task Close()
+    {
+        await ShowChanged.InvokeAsync(false);
+        await OnClosed.InvokeAsync();
+    }
+}
+

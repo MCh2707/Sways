@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+@using Sways.Services
+@inject UserSession UserSession
+@implements IDisposable
+
+<SessionRestorer />
+<div class="sways-app-wrapper" style="@UserSession.GetThemeStyle()">
+    @Body
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        UserSession.OnStateChanged += OnThemeOrSessionChanged;
+    }
+
+    private void OnThemeOrSessionChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        UserSession.OnStateChanged -= OnThemeOrSessionChanged;
+    }
+}
